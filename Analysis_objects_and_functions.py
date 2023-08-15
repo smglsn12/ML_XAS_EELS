@@ -7,16 +7,21 @@ import math
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.decomposition import NMF
-from Materials_Project_Functions import *
+# from Materials_Project_Functions import *
 from scipy.interpolate import interp1d
 import glob
 import matplotlib
 import matplotlib.font_manager as font_manager
 from sklearn.metrics import r2_score
 from matplotlib.cm import ScalarMappable
+import joblib
+import matplotlib.pyplot as plt
+import pandas as pd
 from tabulate import tabulate
+from scipy import interpolate
 
-
+def flatten(list1):
+    return [item for sublist in list1 for item in sublist]
 def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies',
                        intensity_col='Spectrum', broadened_col=None, output_col_energy='Scaled Energy (eV)',
                        output_col_intensity='Scaled Intensity', show_plot = False):
@@ -425,7 +430,7 @@ def build_L2_3(l3, l2, show_plot=True):
     return [L3_energies_rounded, L2_3]
 
 
-def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True):
+def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, savefigure=False):
     if type(noise_dfs) != list:
         noise_dfs = [noise_dfs]
     if type(interp_ranges) != list:
@@ -461,7 +466,8 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True):
                     eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
                                  ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
                     eb1[-1][0].set_linestyle(':')
-                    plt.savefig('R2 Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
+                    if savefigure:
+                        plt.savefig('R2 Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
 
                 else:
                     plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2],
@@ -482,7 +488,8 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True):
                     eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
                                  ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
                     eb1[-1][0].set_linestyle(':')
-                    plt.savefig('RMSE Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
+                    if savefigure:
+                        plt.savefig('RMSE Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
 
                 else:
                     plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2],
@@ -490,9 +497,11 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True):
         if show_err == False:
             plt.legend(fontsize = 22, title="Sampling Interval (eV)", title_fontsize = 22)
             if vis == 'RMSE':
-                plt.savefig('RMSE Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
+                if savefigure:
+                    plt.savefig('RMSE Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
             if vis == 'R2':
-                plt.savefig('R2 Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
+                if savefigure:
+                    plt.savefig('R2 Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
 
 
 def poisson(x, std, random_state=32):
@@ -1142,7 +1151,8 @@ class eels_rf_setup():
     def predict_experiment_folder(self, folder_path, shifts = [0.0], smoothings = [[51,3]], edge_points = [10],
                                   spectra_type = 'csv', cumulative_spec = True,
                                   theory_column = 'XAS_aligned_925_970', energies_range = [925,970], show_hist = False,
-                                  show_plots = False, show_inputted_spectrum=False, print_details = False):
+                                  show_plots = False, show_inputted_spectrum=False, print_details = False,
+                                  savefigure = False):
         paper_paths = glob.glob(folder_path+'/*')
         # print('clean')
 
@@ -1173,7 +1183,8 @@ class eels_rf_setup():
                                                                   show_hist=show_hist,
                                                                   show_plots=show_plots,
                                                                   show_inputted_spectrum = show_inputted_spectrum,
-                                                                  print_prediction=print_details)
+                                                                  print_prediction=print_details,
+                                                                  savefigure=savefigure)
 
                         elif 'Cu2O' in path:
                             self.predict_experiment_random_forest(path, 2240, 'Cu2O',
@@ -1188,7 +1199,8 @@ class eels_rf_setup():
                                                                   show_hist=show_hist,
                                                                   show_plots=show_plots,
                                                                   show_inputted_spectrum = show_inputted_spectrum,
-                                                                  print_prediction=print_details)
+                                                                  print_prediction=print_details,
+                                                                  savefigure=savefigure)
 
                         elif 'CuO' in path:
                             self.predict_experiment_random_forest(path, 2191, 'CuO',
@@ -1203,7 +1215,8 @@ class eels_rf_setup():
                                                                   show_hist=show_hist,
                                                                   show_plots=show_plots,
                                                                   show_inputted_spectrum = show_inputted_spectrum,
-                                                                  print_prediction=print_details)
+                                                                  print_prediction=print_details,
+                                                                  savefigure=savefigure)
 
                         else:
                             self.predict_experiment_random_forest(path, 1640, 'Unlabeled Cu',
@@ -1218,7 +1231,8 @@ class eels_rf_setup():
                                                                   show_hist=show_hist,
                                                                   show_plots=show_plots,
                                                                   show_inputted_spectrum = show_inputted_spectrum,
-                                                                  print_prediction=print_details)
+                                                                  print_prediction=print_details,
+                                                                  savefigure=savefigure)
 
 
                         predictions_set.append(
@@ -1535,7 +1549,7 @@ class eels_rf_setup():
 
         self.mixed_valent_pred.append([self.prediction, self.prediction_std, self.true_val])
 
-    def simulated_mixed_valent(self, catagory = '0-1', colorbar_range = [0.1, 0.5]):
+    def simulated_mixed_valent(self, catagory = '0-1', colorbar_range = [0.1, 0.5], savefigure=False):
         min_std = colorbar_range[0]
         max_std = colorbar_range[1]
         self.reset_mixed_valent_series()
@@ -1582,10 +1596,11 @@ class eels_rf_setup():
         plt.yticks(fontsize=22, fontweight = 'bold')
         plt.xlabel('True Value', fontsize=24, fontweight = 'bold')
         plt.ylabel('Bond Valance Prediction', fontsize=24, fontweight = 'bold')
-        plt.savefig('Simulated Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
+        if savefigure:
+            plt.savefig('Simulated Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
 
     def experimental_mixed_valent(self, catagory = '0-1', smoothing_params = [51,3], show_plots = False,
-                                  show_predicted_spectrum = False, colorbar_range = [0.1, 0.5]):
+                                  show_predicted_spectrum = False, colorbar_range = [0.1, 0.5], savefigure=False):
 
         min_std = colorbar_range[0]
         max_std = colorbar_range[1]
@@ -1654,10 +1669,10 @@ class eels_rf_setup():
         plt.yticks(fontsize=22, fontweight = 'bold')
         plt.xlabel('True Value', fontsize=22, fontweight = 'bold')
         plt.ylabel('Bond Valance Prediction', fontsize=22, fontweight = 'bold')
+        if savefigure:
+            plt.savefig('Experimental Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
 
-        plt.savefig('Experimental Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
-
-    def visualize_shift(self, material = 'All', show_stds = False, show_table = False):
+    def visualize_shift(self, material = 'All', show_stds = False, show_table = False, savefigure=False):
         if material == 'All':
             mins = []
             maxes = []
@@ -1706,7 +1721,8 @@ class eels_rf_setup():
 
                 plt.xlabel('Spectrum Shift (eV)', fontsize=26, fontweight='bold')
                 plt.ylabel('Bond Valance Prediction', fontsize=26, fontweight='bold')
-                plt.savefig('XAS Spectrum Shift Analysis ' + mat + '.pdf', bbox_inches='tight', transparent=True)
+                if savefigure:
+                    plt.savefig('XAS Spectrum Shift Analysis ' + mat + '.pdf', bbox_inches='tight', transparent=True)
 
                 for i in range(0, len(shifts)):
                     full_output.append([round(shifts[i],2), round(predictions[i],2), prediction_std[i], bv])
@@ -1749,7 +1765,7 @@ class eels_rf_setup():
 
 
 
-    def visualize_smoothings(self, material = 'All', show_stds = False, show_table = False):
+    def visualize_smoothings(self, material = 'All', show_stds = False, show_table = False, savefigure = False):
         if material == 'All':
             mins = []
             maxes = []
@@ -1804,7 +1820,8 @@ class eels_rf_setup():
                     print(stds.sort_values('std').head())
                 if show_table:
                     print(tabulate(full_output, headers='firstrow', tablefmt='fancy_grid'))
-                plt.savefig('Spectrum Smoothing Analysis ' + mat + '.png', bbox_inches='tight', transparent=True)
+                if savefigure:
+                    plt.savefig('Spectrum Smoothing Analysis ' + mat + '.png', bbox_inches='tight', transparent=True)
 
         if material == 'Unlabeled':
             subdf = self.prediction_df.loc[self.prediction_df['Material'] == 'Unlabeled Cu']
@@ -1837,7 +1854,7 @@ class eels_rf_setup():
                                          spectrum_energy_shift = 0.0, energies_range = [925, 970],
                                          theory_column = 'XAS_aligned_925_970', print_prediction = True,
                                          use_dnn = False, dnn_model = None, show_plots = False, show_hist = False,
-                                         show_inputted_spectrum = True):
+                                         show_inputted_spectrum = True, savefigure = False):
 
         self.cumulative_spectrum = cumulative_spectrum
         self.theory_index = theory_index
@@ -1911,6 +1928,26 @@ class eels_rf_setup():
             intens_temp = output['Intensity'] - min(output['Intensity'])
             intens = intens_temp / intens_temp[len(intens_temp) - 5]
             energies = output['Energy (eV)']
+            if show_plots:
+                plt.xticks(fontsize=18, fontweight = 'bold')
+                plt.yticks(fontsize=18, fontweight = 'bold')
+                plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
+                plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
+                plt.title('Raw Experimental Spectrum', fontsize=22, fontweight = 'bold')
+                # plt.plot(interp_energies_final,interped_intens_smoothed, label = 'Experiment Smoothed', linewidth = 3)
+                # noise = []
+                # np.random.seed(23)
+                # for entry in intens:
+                    # print(entry)
+                    # noise.append(np.random.normal(0, 50, size=1)[0])
+                # plt.plot(energies, noise, label = 'Noise')
+                plt.plot(energies, intens, zorder=10)
+                # intens = np.asarray(intens) + np.asarray(noise)
+                # plt.plot(energies, intens, label = 'Summed w/Noise')
+                plt.show()
+            self.scale_experimental_spectra(intens, energies, scale=exp_scale)
+            intens = self.interped_intens
+            energies = self.interped_energies
 
             if smoothing == 'default':
                 self.smoothing_params = [51, 3]
@@ -1925,13 +1962,11 @@ class eels_rf_setup():
                     print('values already exist in smoothing params, please reset')
                     raise ValueError
             elif smoothing == 'inputted single':
-                print(material)
-                print('Metal' in material)
-                if 'Metal' in material:
-                    self.smoothing_params = [31,3]
-                else:
-                    self.smoothing_params = smoothing_parms
-                print(self.smoothing_params[0])
+                # print(material)
+                # print('Metal' in material)
+
+                self.smoothing_params = smoothing_parms
+                # print(self.smoothing_params[0])
                 intens = savgol_filter(intens, self.smoothing_params[0],
                                                      self.smoothing_params[1])
             elif smoothing == 'inputted series':
@@ -2083,7 +2118,8 @@ class eels_rf_setup():
 
 
             # if material =='Cu2O':
-            plt.savefig(material + ' Outline Cumulative Spectrum.pdf', bbox_inches='tight', transparent=True)
+            if savefigure:
+                plt.savefig(material + ' Outline Cumulative Spectrum.pdf', bbox_inches='tight', transparent=True)
 
 
         # plt.hlines(1, energies_range[0], energies_range[1], color = 'k')
@@ -2192,7 +2228,8 @@ class eels_rf_setup():
                 weight='bold',
                 style='normal', size=26)
             plt.legend(prop=font)
-            plt.savefig('Prediction Histogram ' + material[0:5] + '.pdf', bbox_inches='tight', transparent=True)
+            if savefigure:
+                plt.savefig('Prediction Histogram ' + material[0:5] + '.pdf', bbox_inches='tight', transparent=True)
             # plt.legend(fontsize=20,  loc='center left', bbox_to_anchor=(1, 0.5))
             # plt.plot(np.arange(0,max(errors),0.1), np.arange(0,max(errors),0.1), color = 'k', linewidth = 3, linestyle = '--')
             plt.show()
