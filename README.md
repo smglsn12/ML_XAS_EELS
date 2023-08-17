@@ -12,3 +12,8 @@ The remaining files in this repo are the main dataset used by this work (final_d
 Of the three directories, two contain spectra analyzed by this work (Cu_deconvolved_spectra and xas paper) and the third contains the saved plots from "Paper_Figures.ipynb" and the final figure files 
 
 Relevant versions: 
+pandas version 1.5.3
+numpy version 1.24.3
+sklearn version 1.0.2
+matplotlib version 3.7.1
+joblib version 1.1.0
