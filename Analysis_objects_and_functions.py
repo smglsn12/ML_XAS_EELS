@@ -20,364 +20,6 @@ import pandas as pd
 from tabulate import tabulate
 from scipy import interpolate
 
-def flatten(list1):
-    return [item for sublist in list1 for item in sublist]
-def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies',
-                       intensity_col='Spectrum', broadened_col=None, output_col_energy='Scaled Energy (eV)',
-                       output_col_intensity='Scaled Intensity', show_plot = False):
-    """
-
-    :param df_w_spectra:
-    :param zero_energy:
-    :param energy_col:
-    :param intensity_col:
-    :param broadened_col:
-    :param output_col_energy:
-    :param output_col_intensity:
-    :param show_plot:
-    :return:
-    """
-    spectra_energies_scaled = []
-    spectra_intensities_scaled = []
-    spectra_broadened_scaled = []
-    mins = []
-    maxes = []
-    for i in range(0, len(df_w_spectra)):
-        energy = df_w_spectra.iloc[i][energy_col]
-        mins.append(min(energy))
-        maxes.append(max(energy))
-    # print(mins)
-    min_lock = max(mins)
-    interp_max = round(min(maxes) - 0.05, 1)
-    for i in range(0, len(df_w_spectra)):
-        full_energies = []
-        full_intens = []
-
-        energy = df_w_spectra.iloc[i][energy_col]
-        intensity = df_w_spectra.iloc[i][intensity_col]
-        if broadened_col != None:
-            broadened_intensity = df_w_spectra.iloc[i]['Corrected Broadened Intensities exp alignment']
-        interp_min = round(min(energy) + 0.05, 1)
-        # print(i)
-        # print(energy)
-        # print(len(energy))
-        # print(len(intensity))
-        # print(len(broadened_intensity))
-
-        f = interpolate.interp1d(energy, intensity)
-        if broadened_col != None:
-            f_broadened = interpolate.interp1d(energy, broadened_intensity)
-        interp_energies = np.arange(interp_min, interp_max + 0.1, 0.1)
-        interp_energies_final = []
-        for en in interp_energies:
-            en_rounded = round(en, 1)
-            if en_rounded <= interp_max:
-                interp_energies_final.append(en_rounded)
-        # print([min(interp_energies_final), max(interp_energies_final)])
-
-        # if round(max(interp_energies), 1) != 774.5:
-        try:
-            interped_intens = f(interp_energies_final)
-            if broadened_col != None:
-                interped_broadened_intens = f_broadened(interp_energies_final)
-        except ValueError:
-            # print(energy)
-            print(interp_energies_final)
-
-        if show_plot:
-            plt.plot(energy, intensity, label='Simulated Spectrum', linewidth=3)
-            plt.title('Illustration of Scaled Baseline', fontsize=22, fontweight = 'bold')
-            plt.xticks(fontsize=18, fontweight = 'bold')
-            plt.yticks(fontsize=18, fontweight = 'bold')
-            plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
-            plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
-            # plt.plot(interp_energies_final, interped_intens, label = 'interpolated')
-            # plt.legend(fontsize = 16)
-            # plt.show()
-            print('interp min = ' + str(interp_min))
-
-        if zero_energy == 'default':
-            zero_energy = interp_min - 1
-
-        x = [zero_energy, interp_energies_final[
-            0]]  # two given datapoints to which the exponential function with power pw should fit
-        y = [10 ** -10, interped_intens[0]]
-
-        if broadened_col != None:
-            y_broadened = [10 ** -10, interped_broadened_intens[0]]
-
-        def func(x, adj1, adj2):
-            return ((x + adj1) ** pw) * adj2
-
-        pw = 6
-        A = np.exp(np.log(y[0] / y[1]) / pw)
-        a = (x[0] - x[1] * A) / (A - 1)
-        b = y[0] / (x[0] + a) ** pw
-
-        end_energy = interp_energies_final[0] - 0.1
-        gap = int(round(end_energy - zero_energy, 1) * 10)
-        # print(gap)
-
-        xf = np.linspace(zero_energy, end_energy, gap + 1)
-        # plt.plot(x, y, 'ko', label="Original Data")
-        ys = func(xf, a, b)
-
-        if broadened_col != None:
-            A = np.exp(np.log(y_broadened[0] / y_broadened[1]) / pw)
-            a = (x[0] - x[1] * A) / (A - 1)
-            b = y_broadened[0] / (x[0] + a) ** pw
-            ys_broad = func(xf, a, b)
-        if show_plot:
-            # ys-min(ys)
-            plt.plot(xf, ys, 'r', label="Fitted Baseline", linewidth=3)
-            # plt.xlim([925, 940])
-            plt.legend(fontsize=16)
-            plt.show()
-            # print(ys - min(ys))
-            # print(xf)
-            # print(interp_energies)
-            plt.show()
-
-        interp_energies_rounded = [round(num, 1) for num in interp_energies_final]
-        extrapolated_energies_rounded = [round(num, 1) for num in xf]
-
-        # if min(interped_intens) < 0.01:
-        # interped_intens = interped_intens + 0.05
-        if np.isnan(ys[0]):
-            # print(interped_intens)
-            # print(ys)
-            # print(full_intens)
-            ys = np.zeros((len(ys)))
-        full_energies = list(extrapolated_energies_rounded) + list(interp_energies_rounded)
-        full_intens = list(ys) + list(interped_intens)
-        full_intens = full_intens - min(full_intens)
-        if min(full_intens) > 10 ** -13:
-            print('fail')
-
-        if broadened_col != None:
-            full_intens_broad = list(ys_broad) + list(interped_broadened_intens)
-            full_intens_broad = full_intens_broad - min(full_intens_broad)
-            if min(full_intens_broad) > 10 ** -13:
-                print('fail')
-
-        # print(full_energies)
-        # plt.plot(x, y, 'ko', label="Original Data")
-        # plt.plot(full_energies, full_intens)
-        # plt.show()
-        # print(full_intens-min(full_intens))
-        spectra_energies_scaled.append(full_energies)
-        spectra_intensities_scaled.append(full_intens)
-        if broadened_col != None:
-            spectra_broadened_scaled.append(full_intens_broad)
-
-    df_w_spectra[output_col_energy] = spectra_energies_scaled
-    df_w_spectra[output_col_intensity] = spectra_intensities_scaled
-    if broadened_col != None:
-        df_w_spectra['Aligned Scaled Broadened'] = spectra_broadened_scaled
-
-    return df_w_spectra
-
-def build_L2_3(l3, l2, show_plot=True):
-
-    """
-
-    :param l3:
-    :param l2:
-    :param show_plot:
-    :return:
-    """
-
-    interp_min_L3 = round(min(l3.T[0]) + 0.15, 1)
-    # print(interp_min_L3)
-    interp_max_L3 = round(max(l3.T[0]) - 0.15, 1)
-    # print(interp_max_L3)
-    L3_energies = np.arange(interp_min_L3, interp_max_L3, 0.1)
-    # print(L3_energies)
-
-    interp_min_L2 = round(min(l2.T[0]) + 0.15, 1)
-    interp_max_L2 = round(max(l2.T[0]) - 0.15, 1)
-    L2_energies = np.arange(interp_min_L2, interp_max_L2, 0.1)
-
-    # plt.vlines(l3_fermi, 0,1.5, color = 'green')
-    f_l2 = interpolate.interp1d(l2.T[0], l2.T[1])
-    f_l3 = interpolate.interp1d(l3.T[0], l3.T[1])
-
-    interped_l3 = f_l3(L3_energies)
-    interped_l2 = f_l2(L2_energies)
-
-    zero_energy = interp_min_L3
-    x = [zero_energy, L2_energies[0]]  # two given datapoints to which the exponential function with power pw should fit
-    y = [10 ** -10, interped_l2[0]]
-
-    def func(x, adj1, adj2):
-        return ((x + adj1) ** pw) * adj2
-
-    pw = 10
-    A = np.exp(np.log(y[0] / y[1]) / pw)
-    a = (x[0] - x[1] * A) / (A - 1)
-    b = y[0] / (x[0] + a) ** pw
-
-    end_energy = L2_energies[0] - 0.1
-    gap = int(round(end_energy - zero_energy, 1) * 10)
-
-    xf = np.linspace(zero_energy, end_energy, gap + 1)
-    # plt.plot(x, y, 'ko', label="Original Data")
-    ys = func(xf, a, b)
-
-    full_energies = list(xf) + list(L2_energies)
-    full_intens = list(ys) + list(interped_l2)
-    full_energies_final = []
-    for i in full_energies:
-        full_energies_final.append(round(i, 1))
-
-    big_bad = False
-    for j in range(1, len(full_energies_final)):
-        if round(full_energies_final[j] - full_energies_final[j - 1], 8) != 0.1:
-            big_bad = True
-    if big_bad == True:
-        raise ValueError
-
-    L2_3 = interped_l3 + full_intens[0:len(L3_energies)]
-    if show_plot:
-        plt.figure(figsize=(8, 6))
-        plt.plot(L3_energies, interped_l3, label='L3', linewidth = 3)
-        plt.plot(full_energies_final[0:len(L3_energies)], full_intens[0:len(L3_energies)], label='L2', linewidth = 3)
-        plt.plot(L3_energies, L2_3, label='L2,3', linewidth = 3)
-        plt.xticks(fontsize=18, fontweight = 'bold')
-        plt.yticks(fontsize=18, fontweight = 'bold')
-        plt.legend(fontsize=14)
-        plt.xlabel('Energy (eV)', fontsize = 20, fontweight = 'bold')
-        plt.ylabel('Intensity', fontsize = 20, fontweight = 'bold')
-        plt.title('L2, L3, L2,3 For mp-30 (Cu(0))', fontsize=22, fontweight = 'bold')
-        plt.show()
-
-    L3_energies_rounded = []
-    for i in L3_energies:
-        L3_energies_rounded.append(round(i, 1))
-
-    return [L3_energies_rounded, L2_3]
-
-
-def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, savefigure=False):
-
-    """
-
-    :param noise_dfs:
-    :param interp_ranges:
-    :param show_err:
-    :param savefigure:
-    :return:
-    """
-
-    if type(noise_dfs) != list:
-        noise_dfs = [noise_dfs]
-    if type(interp_ranges) != list:
-        interp_ranges = [interp_ranges]
-    for vis in ['R2', 'RMSE']:
-        count = -1
-        plt.figure(figsize=(8,7))
-        for noise_df in noise_dfs:
-            count += 1
-            mean_01 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 1000][vis]))
-            mean_05 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 500][vis]))
-            mean_1 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 100][vis]))
-            mean_2 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 50][vis]))
-
-            std_01 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 1000][vis]))
-            std_05 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 500][vis]))
-            std_1 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 100][vis]))
-            std_2 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 50][vis]))
-
-
-            if vis == 'R2':
-                plt.title('R2 vs Noise', fontsize = 36, fontweight='bold')
-                plt.xlabel('Noise STD', fontsize = 36, fontweight='bold')
-                plt.ylabel('R2', fontsize = 36, fontweight='bold')
-                plt.xticks([0,0.1, 0.2], fontsize = 36, fontweight='bold')
-                plt.yticks([0.3,0.6,0.9], fontsize = 36, fontweight='bold')
-                plt.ylim([0.28, 0.95])
-                plt.xlim([-0.01, 0.225])
-                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
-
-                if show_err:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], color = 'k')
-                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
-                                 ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
-                    eb1[-1][0].set_linestyle(':')
-                    if savefigure:
-                        plt.savefig('R2 Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
-
-                else:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2],
-                             linewidth = 4, label = str(interp_ranges[count]))
-
-            if vis == 'RMSE':
-                plt.title('RMSE vs Noise', fontsize = 36, fontweight='bold')
-                plt.xlabel('Noise STD', fontsize = 36, fontweight='bold')
-                plt.ylabel('RMSE', fontsize = 36, fontweight='bold')
-                plt.xticks([0,0.1, 0.2], fontsize = 36, fontweight='bold')
-                plt.yticks([0.2,0.35,0.5], fontsize = 36, fontweight='bold')
-                plt.ylim([0.19, 0.525])
-                plt.xlim([-0.01, 0.225])
-                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
-
-                if show_err:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], color = 'k')
-                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
-                                 ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
-                    eb1[-1][0].set_linestyle(':')
-                    if savefigure:
-                        plt.savefig('RMSE Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
-
-                else:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2],
-                             linewidth = 4, label = str(interp_ranges[count]))
-        if show_err == False:
-            plt.legend(fontsize = 22, title="Sampling Interval (eV)", title_fontsize = 22)
-            if vis == 'RMSE':
-                if savefigure:
-                    plt.savefig('RMSE Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
-            if vis == 'R2':
-                if savefigure:
-                    plt.savefig('R2 Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
-
-
-def poisson(x, std, random_state=32):
-    np.random.seed(random_state)
-
-    noise = np.random.poisson(100, len(x))-100
-    noise = noise/std
-
-    x_noisy = np.asarray(x) + np.asarray(noise)
-
-    return x_noisy
-
-def gaussian_noise(x, mu, std, random_state=32):
-    """
-    :param x: int/float - value to be augmented with gaussian noise
-    :param mu:
-    :param std:
-    :param random_state:
-    :return:
-    """
-    np.random.seed(random_state)
-
-    noise = []
-    for entry in x:
-        noise.append(np.random.normal(mu, std, size=1)[0])
-
-    x_noisy = np.asarray(x) + np.asarray(noise)
-
-    return x_noisy
-
-def spectrum(E,osc,sigma,x):
-    gE=[]
-    for Ei in x:
-        tot=0
-        for Ej,os in zip(E,osc):
-            tot+=os*np.exp(-((((Ej-Ei)/sigma)**2)))
-        gE.append(tot)
-    return gE
 
 
 
@@ -403,7 +45,7 @@ class eels_rf_setup():
     def load_spectra_df(self):
         """
         Loads the spectra df from the filepath provided when the object is initialized and stores it as self.spectra_df
-        :return:
+        :return: stores spectra dataframe as an attribute
         """
         self.spectra_df = joblib.load(self.spectra_df_filepath)
 
@@ -911,7 +553,7 @@ class eels_rf_setup():
         :param interpolation_ranges: list of energy spacings to add to the simulated data test set (list/ndarray)
         :param add_zeros: whether to add zeros at the low energy end of the spectrum (pre onset edge) (bool)
         :param energy_zeros: the energy for the added zeros above to start
-        :return:
+        :return: Interpolated spectra are added to the error df attribute
         """
 
         count = 0
@@ -961,12 +603,13 @@ class eels_rf_setup():
 
     def scale_experimental_spectra(self, intens, energies, scale = 0.1):
         """
-
-        :param intens:
-        :param energies:
-        :param scale:
-        :return:
+        Scales an experimental spectrum so it on an even specified energy scale
+        :param intens: Spectrum intensities to scale (list/ndarray)
+        :param energies: Spectrum energies to scale (list/ndarray)
+        :param scale: Energy spacing for scaled spectrum (float)
+        :return: defines 'interped_intens' and 'interped_energies' attributes for scaled spectrum
         """
+        # set interp range within the energy bounds of the inputted spectrum
         energies_interp = np.arange(round(min(energies)+0.5, 1),round(max(energies)-0.5, 1), scale)
         energies_interp_use = []
         for i in energies_interp:
@@ -974,7 +617,8 @@ class eels_rf_setup():
         f = interp1d(energies, intens)
         interp_intens = f(energies_interp)
 
-        # intens = interp_intens - min(interp_intens)
+        # scale intensity to higher energy tail (no longer does anything from an analytical perspective due to
+        # predictions of cumulative spectrum, but still valuable for visual spectral comparisons)
         interp_intens = interp_intens / interp_intens[len(interp_intens) - 5]
         energies = energies_interp
 
@@ -1122,18 +766,20 @@ class eels_rf_setup():
                                 energies_range = [925, 970],
                                 exp_scale = 0.1):
         """
-
-        :param cu_metal:
-        :param cu2o:
-        :param cuo:
-        :param show_predicted_spectrum:
-        :param show_plots:
-        :param print_predictions:
-        :param folder_path:
-        :param smoothing_params:
-        :param energies_range:
-        :param exp_scale:
-        :return:
+        Generates an experimental mixed valent spectrum for a set of integer valent ratios and predicts that spectrum.
+        Generates both raw spectrum and cumulative spectrum but only predicts the cumulative spectrum
+        :param cu_metal: amount the Cu metal material contributes to the mixture (float between 0 and 1)
+        :param cu2o: amount the Cu(I) material contributes to the mixture (float between 0 and 1)
+        :param cuo: amount the Cu(II) material contributes to the mixture (float between 0 and 1)
+        :param show_predicted_spectrum: whether to make a plot showing the spectrum fed into the model (bool)
+        :param show_plots: whether to show a broader set of plots showing how the mixture spectrum is comprised
+        of the integer spectra (bool)
+        :param print_predictions: whether to print the prediction and prediction std (bool)
+        :param folder_path: path to folder containing integer valent spectra
+        :param smoothing_params: window size and polynomial order for savgol filter smoothing (list of int)
+        :param energies_range: energy range to crop the experimental spectra to (list of int)
+        :param exp_scale: energy axis scale for the experimental spectrum (float)
+        :return: predicts mixed valent spectrum and stores its predictions in 'mixed_valent_pred'
         """
 
         cu_metal = float(cu_metal)
@@ -1147,8 +793,10 @@ class eels_rf_setup():
         # print(paper_paths)
         self.exp_spectra_raw = {}
         self.exp_spectra_cumulative = {}
+        # for each experimental spectrum provided, load and process in the same way as the 'predict_experiment'
+        # functions. First smooth spectra, then scale to 0.1 eV, then crop to 925-970 eV energy range
         for exp_spectrum in paper_paths:
-
+            # load spectrum
             output = nio.dm.dmReader(exp_spectrum)
             intens = output['data']
             energies = output['coords'][0]
@@ -1167,7 +815,7 @@ class eels_rf_setup():
                 plt.xlim([927, 945])
 
 
-
+            # smooth spectrum
             intens = savgol_filter(intens, self.smoothing_params[0], self.smoothing_params[1])
             if show_plots:
                 plt.xticks(fontsize=18)
@@ -1181,8 +829,10 @@ class eels_rf_setup():
                 plt.xlim([927, 945])
                 plt.show()
 
+            # scale to 0.1 eV spacing
             self.scale_experimental_spectra(intens, energies, scale = exp_scale)
 
+            # crop to 925-970 eV range
             self.final_energies = np.arange(energies_range[0], energies_range[1] + 0.2, 0.1)[
                                   0:((energies_range[1] - energies_range[0]) * 10) + 1]
             energies_interp_use = []
@@ -1198,8 +848,11 @@ class eels_rf_setup():
 
             for k in range(0, len(self.intensities_final)):
                 temp_intens.append(sum(self.intensities_final[0:k]))
+
+            # generate cumulative spectrum
             self.standard_cum_spec = temp_intens / max(temp_intens)
 
+            # save generated spectrum to dictionary labeled by spectrum type
             if 'Cu Metal' in exp_spectrum:
                 self.exp_spectra_raw['Cu Metal'] = self.intensities_final
                 self.exp_spectra_cumulative['Cu Metal'] = self.standard_cum_spec
@@ -1211,18 +864,16 @@ class eels_rf_setup():
                 self.exp_spectra_raw['CuO'] = self.intensities_final
                 self.exp_spectra_cumulative['CuO'] = self.standard_cum_spec
 
+        # generate mixture spectra based on provided mixture components
         mixed_spec = self.exp_spectra_raw['Cu Metal'] * cu_fractions[0] + \
                      self.exp_spectra_raw['Cu2O'] * cu_fractions[1] + \
                      self.exp_spectra_raw['CuO'] * cu_fractions[2]
-
-        # self.mixed_cum_spec = self.mixed_cum_spec/max(self.mixed_cum_spec)
-
-
 
         self.mixed_cum_spec = self.exp_spectra_cumulative['Cu Metal'] * cu_fractions[0] + \
                      self.exp_spectra_cumulative['Cu2O'] * cu_fractions[1] + \
                      self.exp_spectra_cumulative['CuO'] * cu_fractions[2]
 
+        # normalize cumulative spectrum
         self.mixed_cum_spec = self.mixed_cum_spec/max(self.mixed_cum_spec)
 
         if show_plots:
@@ -1251,7 +902,6 @@ class eels_rf_setup():
             plt.yticks(fontsize=20)
             plt.show()
 
-        self.mixed_cum_spec = self.mixed_cum_spec / max(self.mixed_cum_spec)
 
         if show_predicted_spectrum:
             plt.figure(figsize=(6,5))
@@ -1261,6 +911,7 @@ class eels_rf_setup():
             plt.yticks(fontsize=20)
             plt.show()
 
+        # predict mixture spectrum and extract predictions for each decision tree
         pred = self.rf_model.predict([np.asarray(self.mixed_cum_spec)])
         predictions_full = []
         trees = self.rf_model.estimators_
@@ -1303,6 +954,7 @@ class eels_rf_setup():
             # plt.plot(np.arange(0,max(errors),0.1), np.arange(0,max(errors),0.1), color = 'k', linewidth = 3, linestyle = '--')
             plt.show()
 
+        # store prediction statistics
         self.prediction = round(pred[0], 2)
         self.prediction_std = round(predictions_std, 2)
         self.true_val = true_val
@@ -1314,6 +966,21 @@ class eels_rf_setup():
                                 theory_col = 'TEAM_1_aligned_925_970',
                                 predict_col = 'Cumulative_Spectra_TEAM_1_aligned_925_970',
                                 show_predictions = False):
+        """
+        This function is very similar to 'predict_Experimental_Cu_non_integers' except its using simulated spectra
+        instead
+        :param cu_metal: amount the Cu metal material contributes to the mixture (float between 0 and 1)
+        :param cu2o: amount the Cu(I) material contributes to the mixture (float between 0 and 1)
+        :param cuo: amount the Cu(II) material contributes to the mixture (float between 0 and 1)
+        :param cu_int_indicies: indicies of the dataframe to use as the integer valent spectra (list of int)
+        :param show_standards: whether to plot the integer valent spectra (bool)
+        :param show_plots: whether to show a series of other plots showing how the mixture spectra are formed (bool)
+        :param energy_col: column from the dataframe containing the energy values (string)
+        :param theory_col: column from the dataframe containing the raw spectrum (string)
+        :param predict_col: column from the dataframe containing the spectrum to predict (string)
+        :param show_predictions: whether to print the predictions (bool)
+        :return: predictions are stored in 'mixed_valent_pred'
+        """
 
         cu_metal = float(cu_metal)
         cu2o = float(cu2o)
@@ -1334,7 +1001,7 @@ class eels_rf_setup():
         energies = self.spectra_df.iloc[cu_int_indicies[0]][energy_col]
 
 
-
+        # generate mixture spectrum from components of integer valent spectra
         mixed_spec = self.spectra_df.iloc[cu_int_indicies[0]][theory_col] * cu_fractions[0] + \
                      self.spectra_df.iloc[cu_int_indicies[1]][theory_col] * cu_fractions[1] + \
                      self.spectra_df.iloc[cu_int_indicies[2]][theory_col] * cu_fractions[2]
@@ -1350,6 +1017,7 @@ class eels_rf_setup():
             plt.yticks(fontsize=20)
             plt.show()
 
+        # generate cumulative spectrum in the same way
         self.mixed_cum_spec = self.spectra_df.iloc[cu_int_indicies[0]][predict_col] * cu_fractions[0] + \
                      self.spectra_df.iloc[cu_int_indicies[1]][predict_col] * cu_fractions[1] + \
                      self.spectra_df.iloc[cu_int_indicies[2]][predict_col] * cu_fractions[2]
@@ -1365,7 +1033,7 @@ class eels_rf_setup():
             plt.xticks(fontsize=20)
             plt.yticks(fontsize=20)
             plt.show()
-
+        # normalize cumulative spectrum
         self.mixed_cum_spec = self.mixed_cum_spec / max(self.mixed_cum_spec)
 
         if show_plots:
@@ -1376,6 +1044,7 @@ class eels_rf_setup():
             plt.yticks(fontsize=20)
             plt.show()
 
+        # predict mixture cumulative spectrum and extract predictions from each decision tree
         pred = self.rf_model.predict([np.asarray(self.mixed_cum_spec)])
         predictions_full = []
         trees = self.rf_model.estimators_
@@ -1422,33 +1091,51 @@ class eels_rf_setup():
         self.prediction_std = round(predictions_std, 2)
         self.true_val = true_val
 
+        # store prediction information
         self.mixed_valent_pred.append([self.prediction, self.prediction_std, self.true_val])
 
     def simulated_mixed_valent(self, catagory = '0-1', colorbar_range = [0.1, 0.5], savefigure=False):
+        """
+        Generates and predicts binary simulated mixture spectra in a range of 50 mixtures from purely the lower
+        oxidation state to purely the higher oxidation state. Plots the results by generating a predicted vs true plot
+        where the scatter plot colors correspond to the prediction standard deviation and a dashed black line shows
+        the location of perfect predictions.
+        :param catagory: types of mixtures to generate and predict, 0-1, 1-2 or 0-2 (string) only supports binary
+        mixtures
+        :param colorbar_range: the range of values for the color bar showing prediction standard deviation (list of
+        float)
+        :param savefigure: whether to save the plot as a pdf (bool)
+        :return: None, summary plot is shown and attributes are set based on 'predict_Cu_non_integers' results
+        """
         min_std = colorbar_range[0]
         max_std = colorbar_range[1]
         self.reset_mixed_valent_series()
+        # set list of 50 mixture ratios
         first_comp = list(np.linspace(1, 0, 51))
         second_comp = list(np.linspace(0, 1, 51))
 
         if catagory == '0-1':
+            # if mixtures of 0 and 1 fix Cu(II) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(first_comp[i], second_comp[i], 0, cu_int_indicies=(1640, 2240, 824))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(0) to Cu(I)', fontsize=23, fontweight = 'bold')
 
         elif catagory == '1-2':
+            # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(0, first_comp[i], second_comp[i], cu_int_indicies=(1640, 2240, 824))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(I) to Cu(II)', fontsize=23, fontweight = 'bold')
 
         elif catagory == '0-2':
+            # if mixtures of 0 and 2 fix Cu(I) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(first_comp[i], 0, second_comp[i], cu_int_indicies=(1640, 2240, 824))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(0) to Cu(II)', fontsize=23)
 
+        # build list of prediction details based on values stored in 'predict_Cu_non_integers'
         trues = np.asarray(self.mixed_valent_pred).T[2]
         predictions = np.asarray(self.mixed_valent_pred).T[0]
         prediction_std = np.asarray(self.mixed_valent_pred).T[1]
@@ -1476,7 +1163,20 @@ class eels_rf_setup():
 
     def experimental_mixed_valent(self, catagory = '0-1', smoothing_params = [51,3], show_plots = False,
                                   show_predicted_spectrum = False, colorbar_range = [0.1, 0.5], savefigure=False):
+        """
+        This function is very similar to 'simulated_mixed_valent' except its using experimetnal spectra instead
 
+        :param catagory: types of mixtures to generate and predict, 0-1, 1-2 or 0-2 (string) only supports
+        binary mixtures
+        :param smoothing_params: window size and polynomial order for savgol filter smoothing (list of int)
+        :param show_predicted_spectrum: whether to make a plot showing the spectrum fed into the model (bool)
+        :param show_plots: whether to show a broader set of plots showing how the mixture spectrum is comprised
+        of the integer spectra (bool)
+        :param colorbar_range: the range of values for the color bar showing prediction standard deviation
+        (list of float)
+        :param savefigure: whether to save the plot as a pdf (bool)
+        :return:
+        """
         min_std = colorbar_range[0]
         max_std = colorbar_range[1]
         first_comp = list(np.linspace(1,0,51))
@@ -1484,12 +1184,18 @@ class eels_rf_setup():
         self.reset_mixed_valent_series()
 
         if catagory == '0-1':
+            # if mixtures of 0 and 1 fix Cu(II) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 # print(first_comp[i] + second_comp[i])
                 self.predict_Experimental_Cu_non_integers(cu_metal=first_comp[i], cu2o=second_comp[i], cuo=0,
-                                                                 show_plots=show_plots, show_predicted_spectrum=show_predicted_spectrum,
+                                                                 show_plots=show_plots,
+                                                          show_predicted_spectrum=show_predicted_spectrum,
                                                              smoothing_params=smoothing_params)
             trues = []
+            # generate true values based on the values returned for the integer spectra from our RF model, rather
+            # than just assigning 0, 1 and 2. This is because we can't  expect the model to do better on mixture
+            # spectra than it does on integers and, as described in the manuscript, we believe the prediction of 0.3
+            # for the Cu metal spectrum is more accurate than its nominal label of zero.
             for i in range(0, len(first_comp)):
                 trues.append(first_comp[i] * 0.31 + second_comp[i] * 1.08)
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
@@ -1498,10 +1204,12 @@ class eels_rf_setup():
             plt.xticks([0.3,0.5,0.7,0.9,1.1])
             plt.yticks([0.3,0.5,0.7,0.9,1.1])
         elif catagory == '1-2':
+            # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 # print(first_comp[i] + second_comp[i])
                 self.predict_Experimental_Cu_non_integers(cu_metal=0, cu2o=first_comp[i], cuo=second_comp[i],
-                                                                 show_plots=show_plots, show_predicted_spectrum=show_predicted_spectrum,
+                                                                 show_plots=show_plots,
+                                                          show_predicted_spectrum=show_predicted_spectrum,
                                                                  smoothing_params=smoothing_params)
             trues = []
             for i in range(0, len(first_comp)):
@@ -1515,7 +1223,8 @@ class eels_rf_setup():
             for i in range(0, len(first_comp)):
                 # print(first_comp[i] + second_comp[i])
                 self.predict_Experimental_Cu_non_integers(cu_metal=first_comp[i], cu2o=0, cuo=second_comp[i],
-                                                                 show_plots=show_plots, show_predicted_spectrum=show_predicted_spectrum,
+                                                                 show_plots=show_plots,
+                                                          show_predicted_spectrum=show_predicted_spectrum,
                                                                  smoothing_params=smoothing_params)
             trues = []
             for i in range(0, len(first_comp)):
@@ -1549,10 +1258,27 @@ class eels_rf_setup():
 
     def visualize_shift(self, material = 'All', show_stds = False, show_table = False, savefigure=False,
                         show_shift_labels = False, shift_labels = (0.9, 1.2, 1.2)):
+        """
+        Generates a scatter plot showing how shifting the energy axis changes the spectrum's predicted oxidation
+        state. This function rests on having already run 'predict_experiment_folder' on a spectrum at a series of
+        different energy shifts.
+
+        :param material: whether to show all Cu standards (Cu Metal, Cu2O and CuO) or an unlabeled spectrum (string,
+        'All' or 'Unlabeled')
+        :param show_stds: whether to print out a list of the lowest prediction standard deviations across a shift
+        series (bool)
+        :param show_table: whether to show a table of all prediction results across a shift series (bool)
+        :param savefigure: whether to save the figures as a pdf (bool)
+        :param show_shift_labels: Whether to draw vertical lines showing the 'true' location of the energy axis
+        in the shift series (bool)
+        :param shift_labels: the location of the above vertical lines (list/ndarray of float)
+        :return: shows shift plot and generates a list of vales for each prediction
+        """
         if material == 'All':
             mins = []
             maxes = []
             for mat in ['Cu Metal', 'Cu2O', 'CuO']:
+                # extract predictions from each standard
                 subdf = self.prediction_df.loc[self.prediction_df['Material'] == mat]
                 prediction_std = np.asarray(subdf['Predictions Std'])
 
@@ -1565,6 +1291,7 @@ class eels_rf_setup():
             bv = 0
             label_count = 0
             for mat in ['Cu Metal', 'Cu2O', 'CuO']:
+                # make scatterplot of each shift series
                 full_output = [['Shift (eV)', 'Prediction', 'Prediction STD', 'True Oxidation State']]
                 subdf = self.prediction_df.loc[self.prediction_df['Material'] == mat]
                 shifts = np.asarray(subdf['Spectrum Energy Shift'])
@@ -1604,7 +1331,7 @@ class eels_rf_setup():
                     plt.vlines(shift_labels[label_count], 0.15, 2.3, linestyles='--', linewidth = 3, color = 'r',
                                label = 'Prediction Manual Alignment')
                     label_count += 1
-                    plt.legend(fontsize = 14)
+                    plt.legend(fontsize = 18)
                 if savefigure:
                     plt.savefig('XAS Spectrum Shift Analysis ' + mat + '.pdf', bbox_inches='tight', transparent=True)
 
@@ -1650,10 +1377,24 @@ class eels_rf_setup():
 
 
     def visualize_smoothings(self, material = 'All', show_stds = False, show_table = False, savefigure = False):
+        """
+        Generates a scatter plot showing how changing the degree of smoothing changes the spectrum's predicted oxidation
+        state. This function rests on having already run 'predict_experiment_folder' on a spectrum at a series of
+        different smoothing values.
+
+        :param material: whether to show all Cu standards (Cu Metal, Cu2O and CuO) or an unlabeled spectrum (string,
+        'All' or 'Unlabeled')
+        :param show_stds: whether to print out a list of the lowest prediction standard deviations across a shift
+        series (bool)
+        :param show_table: whether to show a table of all prediction results across a shift series (bool)
+        :param savefigure: whether to save the figures as a pdf (bool)
+        :return: shows smoothing plot and generates a list of vales for each prediction
+        """
         if material == 'All':
             mins = []
             maxes = []
             for mat in ['Cu Metal', 'Cu2O', 'CuO']:
+                # extract predictions from each standard
                 subdf = self.prediction_df.loc[self.prediction_df['Material'] == mat]
                 prediction_std = np.asarray(subdf['Predictions Std'])
 
@@ -1665,6 +1406,7 @@ class eels_rf_setup():
             bv = 0
 
             for mat in ['Cu Metal', 'Cu2O', 'CuO']:
+                # make scatterplot of each smoothing series
                 full_output = [['Smoothing Window (eV)', 'Prediction', 'Prediction STD', 'True Oxidation State']]
 
                 subdf = self.prediction_df.loc[self.prediction_df['Material'] == mat]
@@ -1675,7 +1417,8 @@ class eels_rf_setup():
                 # print(len(count))
                 sc = plt.scatter(shifts*0.03, predictions, s=200, c=prediction_std, vmin=round(min_std - 0.05, 1),
                                  vmax=round(max_std + 0.05, 1))
-                plt.vlines(1.5, 0.15, 2.3, linewidth = 3, color = 'darkorange', linestyles=['--'], label = 'Default Smoothing')
+                plt.vlines(1.5, 0.15, 2.3, linewidth = 3, color = 'darkorange', linestyles=['--'],
+                           label = 'Default Smoothing')
                 plt.legend(fontsize=16)
                 cb = plt.colorbar(sc, label='Prediction Std')
                 cb.set_ticks([0.1, 0.25, 0.4, 0.55])
@@ -2116,26 +1859,30 @@ class eels_rf_setup():
     def show_errors_histogram(self, nbins = 50, title = 'Error Histogram', show_rmse = True, show_type = 'Abs Error',
                               savefigure=False, error_df = None, yticks = None):
         """
-
-        :param nbins:
-        :param title:
-        :param show_rmse:
-        :param show_type:
-        :param savefigure:
-        :param error_df:
-        :param yticks:
-        :return:
+        Shows a histogram of absolute value errors for the predictions in the test set. The RMSE is drawn in a solid
+        green line and labeled with text.
+        :param nbins: number of bins in the histogram (int)
+        :param title: title of the plot (string)
+        :param show_rmse: whether to show the vertical line indicating the RMSE (bool)
+        :param show_type: whether to show the absolute error 'Abs Error' or the square error 'MSE' (string)
+        :param savefigure: whether to save the plot as a pdf (bool)
+        :param error_df: defaults to using the error dataframe generated by the model training procedure, but a
+        different one can be inputted here (pandas dataframe)
+        :param yticks: the y ticks to use in the plot (list of int or None)
+        :return: none, plot is shown
         """
 
         if type(error_df) == type(None):
             error_df = self.rf_error_df
 
 
-
+        # extract errors from dataframe
         errors = error_df['Errors']
 
+        # calculate RMSE and MSE
         MSE = np.square(errors).mean()
         RMSE = math.sqrt(MSE)
+
         print('RMSE ' + str(RMSE))
         plt.figure(figsize=(8, 6))
         plt.title(title, fontsize=24)
@@ -2145,6 +1892,7 @@ class eels_rf_setup():
             hist = plt.hist(np.square(errors), bins=nbins)
 
         if show_rmse:
+            # add solid green line showing RMSE
             plt.vlines(RMSE, max(hist[0]), min(hist[0]), color='limegreen', linewidth=5, label='RMSE')
             plt.text(RMSE + 0.25, max(hist[0]) - 0.1 * max(hist[0]), 'RMSE = ' + str(round(RMSE, 3)),
                      horizontalalignment='left', fontsize=28, fontweight='bold')
@@ -2165,6 +1913,11 @@ class eels_rf_setup():
 
 
     def show_mixture_samples_accuracy(self):
+        """
+        Shows the R2 and RMSE plots for the integer samlpes that make up the generated mixed valent spectra
+        :return: None, shows plot
+        """
+        # find the materials IDs for the materials that make up the mixed valent samples
         mixture_ids = []
         for i in range(0, len(self.spectra_df)):
             mp_id = self.spectra_df.iloc[i]['mpid_string']
@@ -2173,17 +1926,25 @@ class eels_rf_setup():
                     if m_id not in mixture_ids:
                         mixture_ids.append(m_id)
 
+        # extract these spectra and predict the sub dataset using 'predict_set_of_spectra'
         mixture_df_slice = self.spectra_df.loc[self.spectra_df['mpid_string'].isin(mixture_ids)]
         error_df_mixtures = self.predict_set_of_spectra(mixture_df_slice)
 
+        # show r2 and rmse
         self.show_r2(error_df=error_df_mixtures)
         self.show_errors_histogram(error_df=error_df_mixtures, yticks=[0, 50, 100, 150])
 
     def plot_errors_vs_std(self, scatter_spot_multiplier = 15):
+        """
+        Plots each spectrum in the test set by its error vs its prediction standard deviation
+        :param scatter_spot_multiplier: size of the scatter plots (int)
+        :return: None, shows plot
+        """
         pred = []
         true = []
         condensed_stds = []
         count = []
+
         for i in np.asarray(self.rf_error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts().index):
             pred.append(round(i[0], 1))
             true.append(round(i[1], 1))
@@ -2222,6 +1983,19 @@ class eels_rf_setup():
         plt.show()
 
     def show_r2(self, scatter_spot_multiplier = 15, savefigure=False, error_df = None, show_value_counts_plot = False):
+        """
+        Show the R2 plot for a set of predictions. Predictions and true oxidation states are rounded to the nearest 0.1.
+        Scatter plot sizes are scaled to the number of data points at that point and are colored by the average
+        prediction standard deviation for the data points at that point.
+        :param scatter_spot_multiplier: size of scatter plot points (int)
+        :param savefigure: whether to save the figure as a pdf (bool)
+        :param error_df: defaults to the error df from the training function, but a new one can be inputted here
+        (pandas dataframe)
+        :param show_value_counts_plot: whether to show another plot with scatter points colored by number of values
+        rather than prediction standard deviation (bool)
+        :return: None, plot is shown
+        """
+
         if type(error_df) == type(None):
             error_df = self.rf_error_df
         print('num spectra = ' +str(len(error_df)))
@@ -2232,6 +2006,7 @@ class eels_rf_setup():
         pred = []
         count = []
         condensed_stds = []
+        # extract predictions and labels and round them to 0.1
         for i in np.asarray(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts().index):
             pred.append(round(i[0], 1))
             true.append(round(i[1], 1))
@@ -2245,6 +2020,7 @@ class eels_rf_setup():
         count = np.asarray(count)
 
         if show_value_counts_plot:
+            # create scatter plot with points colored by number of datapoints at that position
             plt.figure(figsize=(8, 6))
             plt.scatter(true, pred, s=count * scatter_spot_multiplier, c=count)
 
@@ -2268,6 +2044,7 @@ class eels_rf_setup():
             plt.xlabel('True Bond Valance', fontsize=22)
             plt.show()
 
+        # create scatter plot with points colored by average prediction std across the datapoints at that position
         plt.figure(figsize=(8, 6))
 
         plt.xticks([0.0, 1.0, 2.0, 3.0], fontsize=32, fontweight='bold')
@@ -2282,6 +2059,7 @@ class eels_rf_setup():
         max_plot = round(max(error_df['Labels Test']) + 1.5, 0)
         plt.plot(np.arange(min_plot, max_plot, 1), np.arange(min_plot, max_plot, 1), color='k', linewidth=3,
                  linestyle='--')
+
         plt.scatter(true, pred, s=count * scatter_spot_multiplier, c=condensed_stds)
         cb = plt.colorbar(label='Prediction Std', ticks = [0.1, 0.2, 0.3, 0.4, 0.5])
         ax = cb.ax
@@ -2296,10 +2074,19 @@ class eels_rf_setup():
             plt.savefig('r^2 plot.pdf',  bbox_inches='tight', transparent=True)
 
     def predictions_from_threshold(self, threshold, show_plot=False):
+        """
+        Determines R2 and RMSE for a subset of the test set where all predictions with a standard deviation greater
+        than a specified threshold are removed
+        :param threshold: standard deviation threshold (float)
+        :param show_plot: whether to show r2 and rmse plots (bool)
+        :return: list of r2, number of test data points under the threshold and rmse
+        """
+        # grab samples under threshold
         low_std = self.rf_error_df.loc[self.rf_error_df['Predictions Std'] <= threshold]
         predictions = low_std['Predictions']
         labels_test = low_std['Labels Test']
         predictions_std = low_std['Predictions Std']
+
         if show_plot:
             plt.figure(figsize=(8, 6))
             min_plot = round(min(labels_test) - 0.5, 0)
@@ -2321,19 +2108,11 @@ class eels_rf_setup():
             for t in cb.ax.get_yticklabels():
                 t.set_fontsize(22)
             plt.show()
-
+        # calculate RMSE and Errors
         MSE = np.square(np.subtract(labels_test, predictions)).mean()
-
         RMSE = math.sqrt(MSE)
-        # print("Root Mean Square Error:\n")
-        # print(RMSE)
-
         errors = np.abs(np.subtract(labels_test, predictions))
 
-        # self.rf_error_df = self.rf_error_df.loc[self.rf_error_df['Predictions Std'] <= threshold]
-        # predictions = low_std['Predictions']
-        # labels_test = low_std['Labels Test']
-        # predictions_std = low_std['Predictions Std']
         if show_plot:
             plt.show()
             plt.figure(figsize=(8, 7))
@@ -2356,15 +2135,15 @@ class eels_rf_setup():
             pred = []
             count = []
             condensed_stds = []
-            for i in np.asarray(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts().index):
+            for i in np.asarray(self.rf_error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts().index):
                 pred.append(round(i[0], 1))
                 true.append(round(i[1], 1))
-                condensed_stds.append(np.mean(error_df.loc[
-                                                  (error_df['Predictions Rounded'] == round(i[0], 1)) & (
-                                                          error_df['Labels Test Rounded'] == round(i[1], 1))][
+                condensed_stds.append(np.mean(self.rf_error_df.loc[
+                                                  (self.rf_error_df['Predictions Rounded'] == round(i[0], 1)) & (
+                                                          self.rf_error_df['Labels Test Rounded'] == round(i[1], 1))][
                                                   'Predictions Std']))
 
-            for k in np.asarray(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts()):
+            for k in np.asarray(self.rf_error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts()):
                 count.append(k)
             count = np.asarray(count)
             # print(count)
@@ -2439,10 +2218,25 @@ class eels_rf_setup():
     def visualize_all_thresholds(self, thresholds, ylims = (0.7, 1.02), width_multiplier = 0.04, text_height = 0.005,
                                  text_fontsize = 12, savefigure = False, show_type = 'percentage_predicted',
                                  color_scheme = 'viridis', yticks_to_use = ()):
+        """
+        Wrapper function which runs 'predictions_from_threshold' for a series of thresholds and displays the results,
+        focusing on how the threshold changes R2, RMSE and the percentage of the test set predicted
+        :param thresholds: standard deviation thresholds to analyze (list/ndarray of float)
+        :param ylims: ylims of the threshold plot (list/ndarray of float)
+        :param width_multiplier: with of bar plot scaling (float)
+        :param text_height: height of plot text above bar plot (float)
+        :param text_fontsize: fontsize of bar plot text (int/flaot)
+        :param savefigure: whether to save the figure as a pdf
+        :param show_type: text to show above the bars, either 'percentage_predicted' or RMSE (string)
+        :param color_scheme: color scheme for bars (string)
+        :param yticks_to_use: yticks for the barplots
+        :return: None, plots are shown
+        """
 
         r2s = []
         percentage_predicted = []
         rmse = []
+        # generate lists of results across thresholds
         for thresh in thresholds:
             output = self.predictions_from_threshold(thresh, show_plot=False)
             # print(output[0])
@@ -2452,7 +2246,7 @@ class eels_rf_setup():
             percentage_predicted.append(output[1] / len(self.rf_error_df))
             rmse.append(output[2])
 
-
+        # scale data for color mapping
         data_x = thresholds
         data_hight = np.asarray(r2s)
         data_color = percentage_predicted
@@ -2500,13 +2294,28 @@ class eels_rf_setup():
         plt.show()
 
     def augment_df_with_mixtures(self, len_mixtures=100, len_combinations=20):
+        """
+        Wrapper function which adds a specified number of mixture samples to our spectral dataset.
+        :param len_mixtures: number of integer spectra to combine into mixture spectra. This parameter will random
+        sample the integer spectra 9 total times this number
+        :param len_combinations: for each combination of integer spectra, the number of different mixture spectra to
+        generate (ie a mixture of Cu(0), Cu2O and CuO will be mixed with different ratios 20 times if this value is 20)
+        :return: Updates dataframe with mixtures
+        """
+        # 100 evenly spaced components from 0 to 1 which will be random sampled to build out the mixture spectra
         cu_metal = list(np.linspace(1, 0, 101))
         cu_1 = list(np.linspace(0, 1, 101))
         cu_2 = list(np.linspace(0, 1, 101))
 
+        # extract integer valent spectra from full dataset
         zeros = self.spectra_df.loc[self.spectra_df['BV Used For Alignment'] == 0.0]
         ones = self.spectra_df.loc[self.spectra_df['BV Used For Alignment'] == 1.0]
         twos = self.spectra_df.loc[self.spectra_df['BV Used For Alignment'] == 2.0]
+
+        # generate mixture dataset based on three different types of mixtures:
+            # mixtures of all three oxidation states, 0, 1 and 2
+            # mixtures of just 0 and 1
+            # mixtures of just 1 and 2
 
         mixture_df = self.add_mixed_valent_spectra(zeros, ones, twos, mixture_type='all', len_mixtures=len_mixtures,
                                               len_combinations=len_combinations, cu_metal=cu_metal, cu_1=cu_1,
@@ -2518,6 +2327,7 @@ class eels_rf_setup():
                                                len_combinations=len_combinations, cu_metal=cu_metal, cu_1=cu_1,
                                                     cu_2=cu_2)
 
+        # compile these into dataframes and add to existing data
         mixture_df_use = pd.DataFrame(mixture_df, columns=['TEAM_1_aligned_925_970', 'mpid_string',
                                                            'pretty_formula', 'BV Used For Alignment',
                                                            'Cumulative_Spectra_TEAM_1_aligned_925_970',
@@ -2540,14 +2350,32 @@ class eels_rf_setup():
     def add_mixed_valent_spectra(self, zeros, ones, twos, mixture_type='all', len_mixtures=100, len_combinations=20,
                                  cu_metal=tuple(np.linspace(1, 0, 101)), cu_1=tuple(np.linspace(1, 0, 101)),
                                  cu_2=tuple(np.linspace(1, 0, 101))):
+        """
+        Adds mixed valent spectra to an existing spectra dataset using integer valent spectra stored in that dataset
+        :param zeros: dataframe of just Cu metal (pandas dataframe)
+        :param ones: dataframe of just Cu(I) (pandas dataframe)
+        :param twos: dataframe of just Cu(II) (pandas dataframe)
+        :param mixture_type: type of mixture to create, 'all', '0-1', or '1-2'. This indicates the oxidation states
+        which will be blended into the mixture (string)
+        :param len_mixtures: number of times to run through this mixture generation process. Each one of these 100
+        mixtures has a randomly drawn set of three integer oxidation states (even if one of those three isn't being
+        used) (int)
+        :param len_combinations: For a given set of three integer valent spectra, the number of different ratios to
+        use to make a mixture  (int)
+        :param cu_metal: values to random sample for Cu metal's mixture ratios (list/ndarray)
+        :param cu_1: values to random sample for Cu metal's mixture ratios (list/ndarray)
+        :param cu_2: values to random sample for Cu metal's mixture ratios (list/ndarray)
+        :return:
+        """
 
         mixture_df = []
         np.random.seed(32)
 
         for k in range(0, len_mixtures):
             # for each mixture (in this case there are 100) we draw a random Cu(0), a random Cu(I) and a random Cu(II)
-            # therefore 900 draws are occuring, and the mixture spectra are comprised of 541 unique integer valence
-            # spectra. 359 draws result in the same spectrum as a previous draw I suppose
+            # therefore 900 draws are occuring, since this is happening over all three mixture types over the full
+            # mixture df generation process, and the mixture spectra are comprised of 541 unique integer valence
+            # spectra. 359 draws result in the same spectrum as a previous draw at this random seed
             index_zero = np.random.randint(0, len(zeros))
             zero = zeros.iloc[index_zero]
             self.mixture_ids.append(zero.mpid_string)
@@ -2561,27 +2389,37 @@ class eels_rf_setup():
             self.mixture_ids.append(two.mpid_string)
 
             if mixture_type == 'all':
+                # draw random ratios for each of the three oxidation states for 'all' case
                 metal_fractions = np.random.choice(cu_metal, len_combinations)
                 cuo_fractions = np.random.choice(cu_2, len_combinations)
 
             elif mixture_type == '0-1':
                 metal_fractions = np.random.choice(cu_metal, len_combinations)
+                # Cu(II) is zero for '0-1' mixtures, however, for notational purposes the Cu(II) is still considered
+                # part of the mixtures, just at zero contribution
                 cuo_fractions = np.zeros((len_combinations))
 
             elif mixture_type == '1-2':
+                # Cu(0) is zero for '1-2' mixtures, however, for notational purposes the Cu(0) is still considered
+                # part of the mixtures, just at zero contribution
                 metal_fractions = np.zeros((len_combinations))
                 cuo_fractions = np.random.choice(cu_2, len_combinations)
 
+            # every mixture contains a non zero Cu(I)
             cu2o_fractions = np.random.choice(cu_1, len_combinations)
+
 
             for j in range(0, len_combinations):
                 sum_comp = metal_fractions[j] + cu2o_fractions[j] + cuo_fractions[j]
+                # if a mixture sums to zero contributions by random chance it's skipped to avoid a divide by zero error
                 if sum_comp == 0:
                     pass
+                # make sure components add to one and are scaled properly
                 else:
                     components = [metal_fractions[j], cu2o_fractions[j], cuo_fractions[j]] / sum_comp
                     # print(components)
 
+                    # generate mixture spectra by multiplying components by their ratios
                     mixed_spec = zero['TEAM_1_aligned_925_970'] * components[0] + \
                                  one['TEAM_1_aligned_925_970'] * components[1] + \
                                  two['TEAM_1_aligned_925_970'] * components[2]
@@ -2592,12 +2430,14 @@ class eels_rf_setup():
 
                     mixed_cum_spec = mixed_cum_spec / max(mixed_cum_spec)
 
+                    # old test that is hopefully no longer relevant
                     if np.isnan((max(mixed_cum_spec))):
                         print(metal_fractions[j], cu2o_fractions[j], cuo_fractions[j])
                         print(sum_comp)
                         print(components)
                         raise ValueError
 
+                    # label mixture spectra by material id and ratios of components
                     mat_ids = [zero.mpid_string, one.mpid_string, two.mpid_string]
                     formulas = [zero.pretty_formula, one.pretty_formula, two.pretty_formula]
                     # print(mat_ids)
@@ -2612,12 +2452,13 @@ class eels_rf_setup():
 
     def predict_set_of_spectra(self, df_slice, using_error_df = False):
         """
-
-        :param df_slice:
-        :param using_error_df:
-        :return:
+        Runs predictions on a subset of a pandas dataframe containing spectra and oxidation state labels
+        :param df_slice: dataset to predict (pandas dataframe)
+        :param using_error_df: whether the inputted dataframe is an error dataframe (bool)
+        :return: dataframe containing predictions, spectra and other labels/prediction statistics
         """
         df_slice.reset_index(inplace = True)
+        # extract spectra and labels
         try:
             labels_to_predict = df_slice['BV Used For Alignment']
         except:
@@ -2631,10 +2472,12 @@ class eels_rf_setup():
         for spec in spectra_to_predict_temp:
             spectra_to_predict.append(np.asarray(spec))
 
+        # predict extracted spectra
         predictions = self.rf_model.predict(spectra_to_predict)
         accuracy = self.rf_model.score(spectra_to_predict, labels_to_predict)
         print('Accuracy = ' + str(accuracy))
 
+        # compile predictions from each tree
         predictions_full = []
         trees = self.rf_model.estimators_
         for tree in trees:
@@ -2654,7 +2497,7 @@ class eels_rf_setup():
         print('RMSE = ' + str(RMSE))
         error_list = []
 
-
+        # store predictions and other labels in dataframe, extract info based on whether it is an error df or not
         if using_error_df == False:
             task_ids = np.asarray(df_slice['mpid_string'])
             for i in range(0, len(df_slice)):
@@ -2813,3 +2656,378 @@ class eels_rf_setup():
 
 
 
+def flatten(list1):
+    return [item for sublist in list1 for item in sublist]
+def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies',
+                       intensity_col='Spectrum', broadened_col=None, output_col_energy='Scaled Energy (eV)',
+                       output_col_intensity='Scaled Intensity', show_plot = False):
+    """
+    Scale a set of spectra so they all start and end at the same point and have a constant energy resolution
+    :param df_w_spectra: dataframe with the unscaled spectra (pandas dataframe)
+    :param zero_energy: energy value for each spectrum to start at. Must be below the lowest energy start for all
+    the spectra in the dataframe (int)
+    :param energy_col: column of the dataframe containing the energy axis (string)
+    :param intensity_col: column of the dataframe containing the intensities (string)
+    :param broadened_col: column of the dataframe containing broadened intensities (if applicable) (string or None)
+    :param output_col_energy: the name to give the scaled energy column created by this function (string)
+    :param output_col_intensity: the name to give the scaled intensity column created by this function (string)
+    :param show_plot: whether to show plots illustrating the scaling process (bool)
+    :return: dataframe updated with scaled spectra columns
+    """
+    # define accumulators to hold new spectra/energies
+    spectra_energies_scaled = []
+    spectra_intensities_scaled = []
+    spectra_broadened_scaled = []
+    mins = []
+    maxes = []
+    for i in range(0, len(df_w_spectra)):
+        energy = df_w_spectra.iloc[i][energy_col]
+        mins.append(min(energy))
+        maxes.append(max(energy))
+    # print(mins)
+    min_lock = max(mins)
+    # make sure that the maximum value of the interpolation is below the maximum value of the lowest energy range
+    # spectrum
+    interp_max = round(min(maxes) - 0.05, 1)
+    for i in range(0, len(df_w_spectra)):
+        full_energies = []
+        full_intens = []
+
+        energy = df_w_spectra.iloc[i][energy_col]
+        intensity = df_w_spectra.iloc[i][intensity_col]
+        if broadened_col != None:
+            broadened_intensity = df_w_spectra.iloc[i]['Corrected Broadened Intensities exp alignment']
+        interp_min = round(min(energy) + 0.05, 1)
+
+        # interpolate spectrum to have new energy axis and start/stop point
+        f = interpolate.interp1d(energy, intensity)
+        if broadened_col != None:
+            f_broadened = interpolate.interp1d(energy, broadened_intensity)
+        interp_energies = np.arange(interp_min, interp_max + 0.1, 0.1)
+        interp_energies_final = []
+        for en in interp_energies:
+            en_rounded = round(en, 1)
+            if en_rounded <= interp_max:
+                interp_energies_final.append(en_rounded)
+        # print([min(interp_energies_final), max(interp_energies_final)])
+
+        # if round(max(interp_energies), 1) != 774.5:
+        try:
+            interped_intens = f(interp_energies_final)
+            if broadened_col != None:
+                interped_broadened_intens = f_broadened(interp_energies_final)
+        except ValueError:
+            # print(energy)
+            print(interp_energies_final)
+
+        if show_plot:
+            plt.plot(energy, intensity, label='Simulated Spectrum', linewidth=3)
+            plt.title('Illustration of Scaled Baseline', fontsize=22, fontweight = 'bold')
+            plt.xticks(fontsize=18, fontweight = 'bold')
+            plt.yticks(fontsize=18, fontweight = 'bold')
+            plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
+            plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
+            # plt.plot(interp_energies_final, interped_intens, label = 'interpolated')
+            # plt.legend(fontsize = 16)
+            # plt.show()
+            print('interp min = ' + str(interp_min))
+
+        if zero_energy == 'default':
+            zero_energy = interp_min - 1
+
+        # set the start of the spectrum to have zero intensity at the pre determined start energy
+        x = [zero_energy, interp_energies_final[
+            0]]  # two given datapoints to which the exponential function with power pw should fit
+        y = [10 ** -10, interped_intens[0]]
+
+        if broadened_col != None:
+            y_broadened = [10 ** -10, interped_broadened_intens[0]]
+
+        # fit a function with a 6th order polynomial to bring the true first value of each spectrum down to zero
+        # smoothly at the pre determined start point
+        def func(x, adj1, adj2):
+            return ((x + adj1) ** pw) * adj2
+
+        pw = 6
+        A = np.exp(np.log(y[0] / y[1]) / pw)
+        a = (x[0] - x[1] * A) / (A - 1)
+        b = y[0] / (x[0] + a) ** pw
+
+        end_energy = interp_energies_final[0] - 0.1
+        gap = int(round(end_energy - zero_energy, 1) * 10)
+        # print(gap)
+
+        xf = np.linspace(zero_energy, end_energy, gap + 1)
+        # plt.plot(x, y, 'ko', label="Original Data")
+        ys = func(xf, a, b)
+
+        if broadened_col != None:
+            A = np.exp(np.log(y_broadened[0] / y_broadened[1]) / pw)
+            a = (x[0] - x[1] * A) / (A - 1)
+            b = y_broadened[0] / (x[0] + a) ** pw
+            ys_broad = func(xf, a, b)
+        if show_plot:
+            # ys-min(ys)
+            plt.plot(xf, ys, 'r', label="Fitted Baseline", linewidth=3)
+            # plt.xlim([925, 940])
+            plt.legend(fontsize=16)
+            plt.show()
+            # print(ys - min(ys))
+            # print(xf)
+            # print(interp_energies)
+            plt.show()
+
+        interp_energies_rounded = [round(num, 1) for num in interp_energies_final]
+        extrapolated_energies_rounded = [round(num, 1) for num in xf]
+
+        if np.isnan(ys[0]):
+            ys = np.zeros((len(ys)))
+        full_energies = list(extrapolated_energies_rounded) + list(interp_energies_rounded)
+        full_intens = list(ys) + list(interped_intens)
+        full_intens = full_intens - min(full_intens)
+        # make sure first value is actually zero!
+        if min(full_intens) > 10 ** -13:
+            print('fail')
+
+        if broadened_col != None:
+            full_intens_broad = list(ys_broad) + list(interped_broadened_intens)
+            full_intens_broad = full_intens_broad - min(full_intens_broad)
+            if min(full_intens_broad) > 10 ** -13:
+                print('fail')
+
+        spectra_energies_scaled.append(full_energies)
+        spectra_intensities_scaled.append(full_intens)
+        if broadened_col != None:
+            spectra_broadened_scaled.append(full_intens_broad)
+
+    # update inputted dataframe with new columns
+    df_w_spectra[output_col_energy] = spectra_energies_scaled
+    df_w_spectra[output_col_intensity] = spectra_intensities_scaled
+    if broadened_col != None:
+        df_w_spectra['Aligned Scaled Broadened'] = spectra_broadened_scaled
+
+    return df_w_spectra
+
+def build_L2_3(l3, l2, show_plot=True):
+
+    """
+    Builds and L2,3 spectrum from inputted L2 and L3 spectra
+    :param l3: L3 spectrum (ndarray)
+    :param l2: L2 spectrum (ndarray)
+    :param show_plot: whether to show the generated L2,3 spectrum and component spectra
+    :return: The L2,3 spectrum, list of ndarray first entery energies, second spectrum
+    """
+    # interpolate L2 and L3 spectra so they start at the same point and are on a common energy axis
+    interp_min_L3 = round(min(l3.T[0]) + 0.15, 1)
+    interp_max_L3 = round(max(l3.T[0]) - 0.15, 1)
+    L3_energies = np.arange(interp_min_L3, interp_max_L3, 0.1)
+
+    interp_min_L2 = round(min(l2.T[0]) + 0.15, 1)
+    interp_max_L2 = round(max(l2.T[0]) - 0.15, 1)
+    L2_energies = np.arange(interp_min_L2, interp_max_L2, 0.1)
+
+    # plt.vlines(l3_fermi, 0,1.5, color = 'green')
+    f_l2 = interpolate.interp1d(l2.T[0], l2.T[1])
+    f_l3 = interpolate.interp1d(l3.T[0], l3.T[1])
+
+    interped_l3 = f_l3(L3_energies)
+    interped_l2 = f_l2(L2_energies)
+
+
+    # scale L2 spectrum so it has a zero at the same starting point as the L3. Generate a set of points that make this
+    # added energy region zero in the L2 spectrum
+    zero_energy = interp_min_L3
+    x = [zero_energy, L2_energies[0]]
+    y = [10 ** -10, interped_l2[0]]
+
+    def func(x, adj1, adj2):
+        return ((x + adj1) ** pw) * adj2
+
+    pw = 10
+    A = np.exp(np.log(y[0] / y[1]) / pw)
+    a = (x[0] - x[1] * A) / (A - 1)
+    b = y[0] / (x[0] + a) ** pw
+
+    end_energy = L2_energies[0] - 0.1
+    gap = int(round(end_energy - zero_energy, 1) * 10)
+
+    xf = np.linspace(zero_energy, end_energy, gap + 1)
+    # plt.plot(x, y, 'ko', label="Original Data")
+    ys = func(xf, a, b)
+
+    full_energies = list(xf) + list(L2_energies)
+    full_intens = list(ys) + list(interped_l2)
+    full_energies_final = []
+    for i in full_energies:
+        full_energies_final.append(round(i, 1))
+
+    big_bad = False
+    for j in range(1, len(full_energies_final)):
+        if round(full_energies_final[j] - full_energies_final[j - 1], 8) != 0.1:
+            big_bad = True
+    if big_bad == True:
+        raise ValueError
+
+    # generate L2,3 spectrum by simple summation of the L2 and L3, now that they have the same start and stop point and
+    # a common energy axis
+    L2_3 = interped_l3 + full_intens[0:len(L3_energies)]
+    if show_plot:
+        plt.figure(figsize=(8, 6))
+        plt.plot(L3_energies, interped_l3, label='L3', linewidth = 3)
+        plt.plot(full_energies_final[0:len(L3_energies)], full_intens[0:len(L3_energies)], label='L2', linewidth = 3)
+        plt.plot(L3_energies, L2_3, label='L2,3', linewidth = 3)
+        plt.xticks(fontsize=18, fontweight = 'bold')
+        plt.yticks(fontsize=18, fontweight = 'bold')
+        plt.legend(fontsize=14)
+        plt.xlabel('Energy (eV)', fontsize = 20, fontweight = 'bold')
+        plt.ylabel('Intensity', fontsize = 20, fontweight = 'bold')
+        plt.title('L2, L3, L2,3 For mp-30 (Cu(0))', fontsize=22, fontweight = 'bold')
+        plt.show()
+
+    L3_energies_rounded = []
+    for i in L3_energies:
+        L3_energies_rounded.append(round(i, 1))
+
+    return [L3_energies_rounded, L2_3]
+
+
+def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, savefigure=False):
+
+    """
+    Visualization function for the data generated by a simulated noise analysis on the simulated test spectra
+    :param noise_dfs: dataframes containing test set accuracies for different noise levels and random states (pandas
+    dataframe)
+    :param interp_ranges: test spectra energy axes present in the dataframe (float/list of float)
+    :param show_err: whether to show error bars indicating the standard deviation across different random states
+    :param savefigure: whether to save the plot as a pdf
+    :return: none plot is generated
+    """
+
+    if type(noise_dfs) != list:
+        noise_dfs = [noise_dfs]
+    if type(interp_ranges) != list:
+        interp_ranges = [interp_ranges]
+    for vis in ['R2', 'RMSE']:
+        count = -1
+        plt.figure(figsize=(8,7))
+        # generate means and standard deviations from different noise levels
+        for noise_df in noise_dfs:
+            count += 1
+            mean_01 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 1000][vis]))
+            mean_05 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 500][vis]))
+            mean_1 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 100][vis]))
+            mean_2 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 50][vis]))
+
+            std_01 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 1000][vis]))
+            std_05 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 500][vis]))
+            std_1 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 100][vis]))
+            std_2 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 50][vis]))
+
+
+            if vis == 'R2':
+                plt.title('R2 vs Noise', fontsize = 36, fontweight='bold')
+                plt.xlabel('Noise STD', fontsize = 36, fontweight='bold')
+                plt.ylabel('R2', fontsize = 36, fontweight='bold')
+                plt.xticks([0,0.1, 0.2], fontsize = 36, fontweight='bold')
+                plt.yticks([0.3,0.6,0.9], fontsize = 36, fontweight='bold')
+                plt.ylim([0.28, 0.95])
+                plt.xlim([-0.01, 0.225])
+                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
+
+                if show_err:
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], color = 'k')
+                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
+                                 ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
+                    eb1[-1][0].set_linestyle(':')
+                    if savefigure:
+                        plt.savefig('R2 Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
+
+                else:
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2],
+                             linewidth = 4, label = str(interp_ranges[count]))
+
+            if vis == 'RMSE':
+                plt.title('RMSE vs Noise', fontsize = 36, fontweight='bold')
+                plt.xlabel('Noise STD', fontsize = 36, fontweight='bold')
+                plt.ylabel('RMSE', fontsize = 36, fontweight='bold')
+                plt.xticks([0,0.1, 0.2], fontsize = 36, fontweight='bold')
+                plt.yticks([0.2,0.35,0.5], fontsize = 36, fontweight='bold')
+                plt.ylim([0.19, 0.525])
+                plt.xlim([-0.01, 0.225])
+                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
+
+                if show_err:
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], color = 'k')
+                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
+                                 ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
+                    eb1[-1][0].set_linestyle(':')
+                    if savefigure:
+                        plt.savefig('RMSE Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
+
+                else:
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2],
+                             linewidth = 4, label = str(interp_ranges[count]))
+        if show_err == False:
+            plt.legend(fontsize = 22, title="Sampling Interval (eV)", title_fontsize = 22)
+            if vis == 'RMSE':
+                if savefigure:
+                    plt.savefig('RMSE Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
+            if vis == 'R2':
+                if savefigure:
+                    plt.savefig('R2 Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
+
+
+def poisson(x, std, random_state=32):
+    """
+    Augment a set of data with poisson noise
+    :param x: list of points to be augmented with noise (list/ndarray)
+    :param std: noise standard deviation (the noise is divided by this parameter, so a higher value is less noisy data)
+    (float)
+    :param random_state: random seed used for this noise profile (int)
+    :return: noisy spectrum (ndarray)
+    """
+    np.random.seed(random_state)
+
+    noise = np.random.poisson(100, len(x))-100
+    noise = noise/std
+
+    x_noisy = np.asarray(x) + np.asarray(noise)
+
+    return x_noisy
+
+def gaussian_noise(x, mu, std, random_state=32):
+    """
+    Augment a set of data with gaussian noise
+
+    :param x: int/float - value to be augmented with gaussian noise
+    :param mu: average of the gaussian (float)
+    :param std: standard deviation of the gaussian  (float)
+    :param random_state: random seed used for this noise profile (int)
+    :return: noisy spectrum (ndarray)
+    """
+    np.random.seed(random_state)
+
+    noise = []
+    for entry in x:
+        noise.append(np.random.normal(mu, std, size=1)[0])
+
+    x_noisy = np.asarray(x) + np.asarray(noise)
+
+    return x_noisy
+
+def spectrum(E,osc,sigma,x):
+    """
+    Generates a spectrum broadened by gaussian broadening
+    :param E: energy vales for the spectrum (list/ndarray)
+    :param osc: intensity values for the spectrum (list/ndarray)
+    :param sigma: gausian distribution standard deviation (float)
+    :param x: energy vales for the spectrum (list/ndarray)
+    :return: broadened spectrum (list)
+    """
+    gE=[]
+    for Ei in x:
+        tot=0
+        for Ej,os in zip(E,osc):
+            tot+=os*np.exp(-((((Ej-Ei)/sigma)**2)))
+        gE.append(tot)
+    return gE
