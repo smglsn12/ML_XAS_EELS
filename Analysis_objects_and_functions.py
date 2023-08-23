@@ -202,7 +202,7 @@ class eels_rf_setup():
     def compare_simulation_to_experiment(self, material='CuO', savgol_params=[51, 3],
                                          xlims=[920, 980], show_feff=False, feff_shift=-10,
                                          compare_to_lit=False, lit_spectrum=None, lit_shift=0.0, title=None,
-                                         show_experiment = True):
+                                         show_experiment = True, savefigure=False):
         """
         Creates a plot comparing any combination of simulated XAS, experimental EELS and literature XAS spectra
 
@@ -228,11 +228,11 @@ class eels_rf_setup():
         energies = output['coords'][0]
 
         plt.figure(figsize=(8, 7))
-        plt.xlabel('Energy (eV)', fontsize=22, fontweight='bold')
-        plt.ylabel('Intensity', fontsize=22, fontweight='bold')
-        plt.title(title, fontsize=24, fontweight='bold')
-        plt.xticks(fontsize=20, fontweight='bold')
-        plt.yticks(fontsize=20, fontweight='bold')
+        plt.xlabel('Energy (eV)', fontsize=36)
+        plt.ylabel('Intensity', fontsize=36)
+        plt.title(title, fontsize=36)
+        plt.xticks([930,950,970], fontsize=36)
+        plt.yticks(fontsize=36)
 
         interped_intens_smoothed = savgol_filter(intens / max(intens), savgol_params[0], savgol_params[1])
 
@@ -282,7 +282,12 @@ class eels_rf_setup():
                      color='#ff7f0e',
                      linewidth=3, linestyle='-', label='FEFF9 Simulation')
         plt.xlim(xlims)
-        plt.legend(fontsize=18)
+        plt.legend(fontsize=28)
+        if savefigure:
+            plt.savefig(material + ' Comparison.pdf',
+                    bbox_inches='tight', transparent=True)
+        plt.show()
+
 
     def visualize_mixtures(self, cu_metal_id, cu2o_id, cuo_id, cu_fraction=0.5, cu2o_fraction=0.5, cuo_fraction=0.0,
                            include_ticks=False, include_title=True, savefigure = False):
@@ -338,22 +343,21 @@ class eels_rf_setup():
         plt.plot(energies, mix_spec, label=mix_str, linewidth=4)
 
         font = font_manager.FontProperties(
-            weight='bold',
             style='normal', size=24)
 
 
         if include_ticks:
-            plt.xlabel('Energy (eV)', fontsize=36, fontweight='bold')
-            plt.xticks([930, 950, 970], fontsize=36, fontweight='bold')
+            plt.xlabel('Energy (eV)', fontsize=36)
+            plt.xticks([930, 950, 970], fontsize=36)
         else:
-            plt.xticks([], fontsize=36, fontweight='bold')
+            plt.xticks([], fontsize=36)
 
         if include_title:
-            plt.title('Mixture Spectrum Example', fontsize=24, fontweight='bold')
+            plt.title('Mixture Spectrum Example', fontsize=24)
 
         plt.xlim([922.5, 975])
         # plt.ylabel(' Intensty', fontsize = 36, fontweight='bold')
-        plt.yticks([], fontsize=36, fontweight='bold')
+        plt.yticks([], fontsize=36)
         plt.ylim([-0.05, max(mix_spec) + 0.25])
         plt.legend(prop=font)
 
@@ -362,7 +366,8 @@ class eels_rf_setup():
             plt.savefig(str([cu_metal_id, cu2o_id, cuo_id, cu_fraction, cu2o_fraction, cuo_fraction]) + '.pdf',
                     bbox_inches='tight', transparent=True)
 
-    def visualize_mixture_addition(self, column = 'BV Used For Alignment', include_mixtures=False, savefigure = False):
+    def visualize_mixture_addition(self, column = 'BV Used For Alignment', include_mixtures=False, right_y_ticks = False,
+                                   savefigure = False):
 
         """
         Displays the spread of spectra in the dataset corresponding to each oxidation state. Can show either only
@@ -386,8 +391,8 @@ class eels_rf_setup():
         colors = ['#2ca02c', '#ff7f0e', '#1f77b4']
 
         fig, ax1 = plt.subplots(figsize=(8, 7))
-        # if include_mixtures:
-            # ax1.yaxis.tick_right()
+        if right_y_ticks:
+            ax1.yaxis.tick_right()
         ax1.bar(xs1, ys1, color=colors, width=0.3)
 
         # ax = plt.figure(figsize=(8,7))
@@ -401,16 +406,16 @@ class eels_rf_setup():
                     mixture_values.append(self.spectra_df.iloc[i][column])
             ax1.hist(mixture_values, bins=20, color='#d62728')
 
-        plt.title('Spectra Per Oxidation State', fontsize=26, fontweight='bold')
+        plt.title('Spectra Per Oxidation State', fontsize=32)
 
         font = font_manager.FontProperties(
             weight='bold',
             style='normal', size=22)
-        plt.xlabel('Oxidation State', fontsize=36, fontweight='bold')
+        plt.xlabel('Oxidation State', fontsize=36)
         # plt.ylabel('Count', fontsize = 36, fontweight='bold')
         plt.xlim([-0.2, 2.2])
-        plt.xticks([0, 1, 2], fontsize=36, fontweight='bold')
-        plt.yticks([0, 400, 800, 1200], fontsize=36, fontweight='bold')
+        plt.xticks([0, 1, 2], fontsize=36)
+        plt.yticks([0, 400, 800, 1200], fontsize=36)
         if savefigure:
             if include_mixtures:
                 plt.savefig('Full Dataset Mixtures.pdf', bbox_inches='tight', transparent=True)
@@ -527,18 +532,17 @@ class eels_rf_setup():
         plt.plot(energies, cu2o, label=label_cu2o, linewidth=4)
         plt.plot(energies, cuo, label=label_cuo, linewidth=4)
         if include_title:
-            plt.title('Random Sample Cu(0), Cu(I) and Cu(II)', fontsize=20, fontweight='bold')
+            plt.title('Random Sample Cu(0), Cu(I) and Cu(II)', fontsize=20)
 
         font = font_manager.FontProperties(
-            weight='bold',
             style='normal', size=22)
         # plt.ylabel(' Intensty', fontsize = 36, fontweight='bold')
         if include_ticks:
-            plt.xlabel('Energy (eV)', fontsize=36, fontweight='bold')
-            plt.xticks([930, 950, 970], fontsize=36, fontweight='bold')
+            plt.xlabel('Energy (eV)', fontsize=36)
+            plt.xticks([930, 950, 970], fontsize=36)
         else:
             plt.xticks([])
-        plt.yticks([], fontsize=36, fontweight='bold')
+        plt.yticks([], fontsize=36)
         plt.legend(prop=font)
 
         if savefigure:
@@ -1119,14 +1123,14 @@ class eels_rf_setup():
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(first_comp[i], second_comp[i], 0, cu_int_indicies=(1640, 2240, 824))
             plt.figure(figsize=(8, 7))
-            plt.title('Simulated Mixtures Cu(0) to Cu(I)', fontsize=23, fontweight = 'bold')
+            plt.title('Simulated Mixtures Cu(0) to Cu(I)', fontsize=23)
 
         elif catagory == '1-2':
             # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(0, first_comp[i], second_comp[i], cu_int_indicies=(1640, 2240, 824))
             plt.figure(figsize=(8, 7))
-            plt.title('Simulated Mixtures Cu(I) to Cu(II)', fontsize=23, fontweight = 'bold')
+            plt.title('Simulated Mixtures Cu(I) to Cu(II)', fontsize=23)
 
         elif catagory == '0-2':
             # if mixtures of 0 and 2 fix Cu(I) to zero in 'predict_Cu_non_integers'
@@ -1149,15 +1153,15 @@ class eels_rf_setup():
         plt.plot(trues, trues, color='k', linestyle='--', linewidth=3)
         ax = cb.ax
         text = ax.yaxis.label
-        font = matplotlib.font_manager.FontProperties(size=22, weight='bold')
+        font = matplotlib.font_manager.FontProperties(size=22)
         text.set_font_properties(font)
         for t in cb.ax.get_yticklabels():
             t.set_fontsize(22)
-            t.set_weight('bold')
-        plt.xticks(fontsize=22, fontweight = 'bold')
-        plt.yticks(fontsize=22, fontweight = 'bold')
-        plt.xlabel('True Value', fontsize=24, fontweight = 'bold')
-        plt.ylabel('Bond Valance Prediction', fontsize=24, fontweight = 'bold')
+            # t.set_weight('bold')
+        plt.xticks(fontsize=22)
+        plt.yticks(fontsize=22)
+        plt.xlabel('True Value', fontsize=24)
+        plt.ylabel('Bond Valance Prediction', fontsize=24)
         if savefigure:
             plt.savefig('Simulated Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
 
@@ -1200,7 +1204,7 @@ class eels_rf_setup():
                 trues.append(first_comp[i] * 0.31 + second_comp[i] * 1.08)
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
             plt.figure(figsize=(8, 7))
-            plt.title('Experimental Mixtures Cu(0) to Cu(I)', fontsize=22, fontweight = 'bold')
+            plt.title('Experimental Cu(0) to Cu(I)', fontsize=22)
             plt.xticks([0.3,0.5,0.7,0.9,1.1])
             plt.yticks([0.3,0.5,0.7,0.9,1.1])
         elif catagory == '1-2':
@@ -1216,7 +1220,7 @@ class eels_rf_setup():
                 trues.append(first_comp[i] * 1.08 + second_comp[i] * 1.99)
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
             plt.figure(figsize=(8, 7))
-            plt.title('Experimental Mixtures Cu(I) to Cu(II)', fontsize=22, fontweight = 'bold')
+            plt.title('Experimental Cu(I) to Cu(II)', fontsize=22)
 
 
         elif catagory == '0-2':
@@ -1244,20 +1248,20 @@ class eels_rf_setup():
         plt.plot(trues, trues, color='k', linestyle='--', linewidth=3)
         ax = cb.ax
         text = ax.yaxis.label
-        font = matplotlib.font_manager.FontProperties(size=22, weight='bold')
+        font = matplotlib.font_manager.FontProperties(size=22)
         text.set_font_properties(font)
         for t in cb.ax.get_yticklabels():
             t.set_fontsize(22)
-            t.set_weight('bold')
-        plt.xticks(fontsize=22, fontweight = 'bold')
-        plt.yticks(fontsize=22, fontweight = 'bold')
-        plt.xlabel('True Value', fontsize=22, fontweight = 'bold')
-        plt.ylabel('Bond Valance Prediction', fontsize=22, fontweight = 'bold')
+            # t.set_weight('bold')
+        plt.xticks(fontsize=22)
+        plt.yticks(fontsize=22)
+        plt.xlabel('True Value', fontsize=22)
+        plt.ylabel('Bond Valance Prediction', fontsize=22)
         if savefigure:
             plt.savefig('Experimental Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
 
     def visualize_shift(self, material = 'All', show_stds = False, show_table = False, savefigure=False,
-                        show_shift_labels = False, shift_labels = (0.9, 1.2, 1.2)):
+                        show_shift_labels = False, shift_labels = (0.9, 1.2, 1.2), spectrum_type = 'XAS'):
         """
         Generates a scatter plot showing how shifting the energy axis changes the spectrum's predicted oxidation
         state. This function rests on having already run 'predict_experiment_folder' on a spectrum at a series of
@@ -1290,6 +1294,7 @@ class eels_rf_setup():
 
             bv = 0
             label_count = 0
+            label_fontsizes = [21, 21, 19]
             for mat in ['Cu Metal', 'Cu2O', 'CuO']:
                 # make scatterplot of each shift series
                 full_output = [['Shift (eV)', 'Prediction', 'Prediction STD', 'True Oxidation State']]
@@ -1307,33 +1312,44 @@ class eels_rf_setup():
                 # print(len(count))
                 sc = plt.scatter(shifts, predictions, s=200, c=prediction_std, vmin = round(min_std-0.05,1),
                             vmax = round(max_std+0.05, 1),)
-                cb = plt.colorbar(sc, label='Prediction Std')
-                cb.set_ticks(np.linspace(round(min_std-0.05,1), round(max_std+0.05, 1), 5))
-                ax = cb.ax
-                text = ax.yaxis.label
-                font = matplotlib.font_manager.FontProperties(size=26, weight='bold')
-                text.set_font_properties(font)
-                cb.ax.set_yticklabels([0.1, 0.3, 0.5, 0.7, 0.9], fontsize=26, weight='bold')
+                plt.title(mat + ' ' + spectrum_type, fontsize=28)
+                if mat == 'Cu2O':
+                    plt.title('Cu$_2$O' + ' ' + spectrum_type, fontsize=28)
 
-                plt.title(mat + ' vs Spectrum Shift', fontsize=28, fontweight='bold')
-                plt.xticks(ticks, fontsize=24, fontweight='bold')
+                plt.xticks(ticks, fontsize=24)
+                plt.xlabel('Spectrum Shift (eV)', fontsize=26)
+
+                if mat == 'CuO':
+                    cb = plt.colorbar(sc, label='Prediction Std')
+                    cb.set_ticks(np.linspace(round(min_std-0.05,1), round(max_std+0.05, 1), 5))
+                    ax = cb.ax
+                    text = ax.yaxis.label
+                    font = matplotlib.font_manager.FontProperties(size=26)
+                    text.set_font_properties(font)
+                    cb.ax.set_yticklabels([0.1, 0.3, 0.5, 0.7, 0.9], fontsize=26)
+                    plt.xticks(ticks, fontsize=22.5)
+                    plt.xlabel('Spectrum Shift (eV)', fontsize=24.5)
+
                 # if mat == 'CuO':
                 plt.ylim([0.15,2.3])
                 # plt.yticks([0.0, 0.5, 1.0, 1.5, 2.0])
-                plt.yticks(fontsize=24, fontweight='bold')
+                if mat == 'Cu Metal':
+                    plt.yticks(fontsize=24)
+                    plt.ylabel('Bond Valance Prediction', fontsize = 26)
+                else:
+                    plt.tick_params(labelleft=False)
 
-
-                plt.xlabel('Spectrum Shift (eV)', fontsize=26, fontweight='bold')
-                plt.ylabel('Bond Valance Prediction', fontsize=26, fontweight='bold')
                 if show_shift_labels:
                     plt.vlines(0.0, 0.15, 2.3, linestyles='--', linewidth = 3, color = 'k',
                                label = 'Prediction Raw Spectrum')
                     plt.vlines(shift_labels[label_count], 0.15, 2.3, linestyles='--', linewidth = 3, color = 'r',
                                label = 'Prediction Manual Alignment')
+                    plt.legend(fontsize = label_fontsizes[label_count])
                     label_count += 1
-                    plt.legend(fontsize = 18)
+
+
                 if savefigure:
-                    plt.savefig('XAS Spectrum Shift Analysis ' + mat + '.pdf', bbox_inches='tight', transparent=True)
+                    plt.savefig(spectrum_type + ' Spectrum Shift Analysis ' + mat + '.pdf', bbox_inches='tight', transparent=True)
 
                 for i in range(0, len(shifts)):
                     full_output.append([round(shifts[i],2), round(predictions[i],2), prediction_std[i], bv])
@@ -1419,24 +1435,29 @@ class eels_rf_setup():
                                  vmax=round(max_std + 0.05, 1))
                 plt.vlines(1.5, 0.15, 2.3, linewidth = 3, color = 'darkorange', linestyles=['--'],
                            label = 'Default Smoothing')
-                plt.legend(fontsize=16)
+                if mat == 'CuO':
+                    plt.legend(fontsize=23.25, loc='lower right')
+                else:
+                    plt.legend(fontsize=23.25)
                 cb = plt.colorbar(sc, label='Prediction Std')
                 cb.set_ticks([0.1, 0.25, 0.4, 0.55])
                 ax = cb.ax
                 text = ax.yaxis.label
-                font = matplotlib.font_manager.FontProperties(size=26, weight='bold')
+                font = matplotlib.font_manager.FontProperties(size=26)
                 text.set_font_properties(font)
                 for t in cb.ax.get_yticklabels():
-                    t.set_fontsize(22)
-                    t.set_weight('bold')
-                plt.title(mat + ' vs Smoothing', fontsize=28, fontweight='bold')
-                plt.xticks(fontsize=24, fontweight='bold')
+                    t.set_fontsize(24)
+                    # t.set_weight('bold')
+                if mat == 'Cu2O':
+                    mat = 'Cu$_2$O'
+                plt.title(mat + ' vs Smoothing', fontsize=28)
+                plt.xticks(fontsize=24)
                 # if mat == 'CuO':
                 plt.ylim([0.15, 2.3])
                 # plt.yticks([0.0, 0.5, 1.0, 1.5, 2.0])
-                plt.yticks(fontsize=24, fontweight='bold')
-                plt.xlabel('Smoothing Window (eV)', fontsize=26, fontweight='bold')
-                plt.ylabel('Bond Valance Prediction', fontsize=26, fontweight='bold')
+                plt.yticks(fontsize=24)
+                plt.xlabel('Smoothing Window (eV)', fontsize=26)
+                plt.ylabel('Bond Valance Prediction', fontsize=26)
 
                 for i in range(0, len(shifts)):
                     full_output.append([shifts[i]*0.03, round(predictions[i], 2), prediction_std[i], bv])
@@ -1447,8 +1468,10 @@ class eels_rf_setup():
                     print(stds.sort_values('std').head())
                 if show_table:
                     print(tabulate(full_output, headers='firstrow', tablefmt='fancy_grid'))
+                if mat == 'Cu$_2$O':
+                    mat = 'Cu2O'
                 if savefigure:
-                    plt.savefig('Spectrum Smoothing Analysis ' + mat + '.png', bbox_inches='tight', transparent=True)
+                    plt.savefig('Spectrum Smoothing Analysis ' + mat + '.pdf', bbox_inches='tight', transparent=True)
 
         if material == 'Unlabeled':
             subdf = self.prediction_df.loc[self.prediction_df['Material'] == 'Unlabeled Cu']
@@ -1530,13 +1553,13 @@ class eels_rf_setup():
             intens = output['data']
             energies = output['coords'][0]
 
-            # plt.figure(figsize=(8, 7))
             if show_plots:
-                plt.xticks(fontsize=18, fontweight = 'bold')
-                plt.yticks(fontsize=18, fontweight = 'bold')
-                plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
-                plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
-                plt.title('Raw Experimental Spectrum', fontsize=22, fontweight = 'bold')
+                plt.figure(figsize=(8, 7))
+                plt.xticks([900, 920, 940, 960, 980], fontsize=36)
+                plt.yticks(fontsize=36)
+                plt.ylabel('Intensity', fontsize=36)
+                plt.xlabel('Energy (eV)', fontsize=36)
+                plt.title('Raw Experimental Spectrum', fontsize=36)
                 # plt.plot(interp_energies_final,interped_intens_smoothed, label = 'Experiment Smoothed', linewidth = 3)
                 # noise = []
                 # np.random.seed(23)
@@ -1547,6 +1570,8 @@ class eels_rf_setup():
                 plt.plot(energies, intens, zorder=10)
                 # intens = np.asarray(intens) + np.asarray(noise)
                 # plt.plot(energies, intens, label = 'Summed w/Noise')
+                if savefigure:
+                    plt.savefig(material + ' Raw Spectrum.pdf', bbox_inches='tight', transparent=True)
                 plt.show()
                 new_noise = []
 
@@ -1579,11 +1604,11 @@ class eels_rf_setup():
             intens = intens_temp / intens_temp[len(intens_temp) - 5]
             energies = output['Energy (eV)']
             if show_plots:
-                plt.xticks(fontsize=18, fontweight = 'bold')
-                plt.yticks(fontsize=18, fontweight = 'bold')
-                plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
-                plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
-                plt.title('Raw Experimental Spectrum', fontsize=22, fontweight = 'bold')
+                plt.xticks([900, 920, 940, 960, 980], fontsize=36)
+                plt.yticks(fontsize=36)
+                plt.ylabel('Intensity', fontsize=36)
+                plt.xlabel('Energy (eV)', fontsize=36)
+                plt.title('Raw Experimental Spectrum', fontsize=22)
                 # plt.plot(interp_energies_final,interped_intens_smoothed, label = 'Experiment Smoothed', linewidth = 3)
                 # noise = []
                 # np.random.seed(23)
@@ -1610,11 +1635,12 @@ class eels_rf_setup():
                                                      self.smoothing_params[1])
 
         if show_plots:
-            plt.xticks(fontsize=18, fontweight = 'bold')
-            plt.yticks(fontsize=18, fontweight = 'bold')
-            plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
-            plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
-            plt.title('Post Smoothing', fontsize=22, fontweight = 'bold')
+            plt.figure(figsize=(8, 7))
+            plt.xticks([900, 920, 940, 960, 980], fontsize=36)
+            plt.yticks(fontsize=36)
+            plt.ylabel('Intensity', fontsize=36)
+            plt.xlabel('Energy (eV)', fontsize=36)
+            plt.title('Post Smoothing', fontsize=36)
             # plt.plot(interp_energies_final,interped_intens_smoothed, label = 'Experiment Smoothed', linewidth = 3)
             plt.plot(energies, intens / max(intens),
                      label='Experimental Spectrum', linewidth=3, zorder=10)
@@ -1622,6 +1648,8 @@ class eels_rf_setup():
             #          self.spectra_df.iloc[theory_index][theory_column][0:451] / max(
             #              self.spectra_df.iloc[theory_index][theory_column][0:451]),
             #          label='From FEFF', linewidth=3)
+            if savefigure:
+                plt.savefig(material + ' Post Smoothing Spectrum.pdf', bbox_inches='tight', transparent=True)
             plt.show()
 
         # scale spectrum to have 0.1 eV energy axis
@@ -1629,13 +1657,16 @@ class eels_rf_setup():
         # paper, since that has already been scaled to 0.1 eV
 
         if show_plots:
+            plt.figure(figsize=(8, 7))
             plt.plot(self.interped_energies, self.interped_intens / max(self.interped_intens),
                      label='Experimental Spectrum', linewidth=3, zorder=10)
-            plt.xticks(fontsize=18, fontweight = 'bold')
-            plt.yticks(fontsize=18, fontweight = 'bold')
-            plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
-            plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
-            plt.title('Post Interpolation', fontsize=22, fontweight = 'bold')
+            plt.xticks([900, 920, 940, 960, 980], fontsize=36)
+            plt.yticks(fontsize=36)
+            plt.ylabel('Intensity', fontsize=36)
+            plt.xlabel('Energy (eV)', fontsize=36)
+            plt.title('Post Interpolation', fontsize=36)
+            if savefigure:
+                plt.savefig(material + ' Post Interpolated Spectrum.pdf', bbox_inches='tight', transparent=True)
             plt.show()
 
         # shift spectrum if inputted
@@ -1698,19 +1729,33 @@ class eels_rf_setup():
         self.intensities_final = f(self.final_energies)
 
         if show_plots:
-            plt.xticks(fontsize=18, fontweight = 'bold')
-            plt.yticks(fontsize=18, fontweight = 'bold')
-            plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
-            plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
-            plt.title('Post Cropping', fontsize=22, fontweight = 'bold')
+            plt.figure(figsize=(8, 7))
+            plt.xticks(fontsize=36)
+            plt.yticks(fontsize=36)
+            plt.xlabel('Energy (eV)', fontsize=36)
+            plt.ylabel('Intensity', fontsize = 36)
+            plt.title('Post Cropping', fontsize=36)
             # plt.plot(interp_energies_final,interped_intens_smoothed, label = 'Experiment Smoothed', linewidth = 3)
             plt.plot(self.final_energies, self.intensities_final,
                      label='Experimental Spectrum', linewidth=4, zorder=10)
+            if savefigure:
+                plt.savefig(material + ' Post Cropping Spectrum.pdf', bbox_inches='tight', transparent=True)
+            plt.show()
             # plt.plot(self.spectra_df.iloc[theory_index][self.energy_col],
             #          self.spectra_df.iloc[theory_index][theory_column][0:451],
             #          label='From FEFF', linewidth=4)
-
-
+            plt.figure(figsize=(8, 7))
+            plt.xticks([930, 950, 970], fontsize=36)
+            plt.yticks(fontsize=36)
+            plt.ylabel('Intensity', fontsize=36)
+            plt.xlabel('Energy (eV)', fontsize=36)
+            plt.title('EELS Spectrum ' + material, fontsize=30)
+            # plt.plot(interp_energies_final,interped_intens_smoothed, label = 'Experiment Smoothed', linewidth = 3)
+            plt.plot(self.final_energies, self.intensities_final,
+                     label='Experimental Spectrum', linewidth=4, zorder=10)
+            if savefigure:
+                plt.savefig(material + ' Exp Spectrum.pdf', bbox_inches='tight', transparent=True)
+            plt.show()
 
         # another somewhat meaningless rescaling, since it will all be undone by the cumulative spectrum operation
         self.intensities_final = self.intensities_final / np.mean(self.intensities_final[len(self.intensities_final) - points_to_average:len(self.intensities_final)])
@@ -1724,12 +1769,12 @@ class eels_rf_setup():
         # print(self.intensities_final)
         if show_inputted_spectrum:
             plt.figure(figsize=(8, 7))
-            plt.xlabel('Energy (eV)', fontsize=36, fontweight='bold')
-            plt.ylabel(' Intensty', fontsize = 36, fontweight='bold')
-            plt.xticks([930, 950, 970], fontsize=36, fontweight='bold')
+            plt.xlabel('Energy (eV)', fontsize=36)
+            plt.ylabel('Intensity', fontsize = 36)
+            plt.xticks([930, 950, 970], fontsize=36)
             # plt.yticks([0, 0.5, 1], fontsize=36, fontweight='bold')
-            plt.yticks([])
-            plt.title('Cumulative Spectrum ' + material, fontsize=29, fontweight='bold')
+            plt.yticks(fontsize = 36)
+            plt.title('Cumulative Spectrum ' + material, fontsize=29)
 
             # self.intensities_final = self.intensities_final - min(self.intensities_final)
 
@@ -1798,7 +1843,10 @@ class eels_rf_setup():
 
         if show_hist:
             plt.figure(figsize=(8, 7))
-            plt.title('Prediction Histogram ' + material[0:4], fontsize=30, fontweight='bold')
+            plt.title('Prediction Histogram ' + material[0:4], fontsize=30)
+            if material[0:4] == 'Cu M':
+                plt.title('Prediction Histogram Cu Metal', fontsize=30)
+
             hist = plt.hist(predictions_full, edgecolor='k', facecolor='grey', fill=True, linewidth=3)
             height = max(hist[0])
 
@@ -1816,13 +1864,12 @@ class eels_rf_setup():
             plt.hlines(height / 2, high, low, color='limegreen', linewidth=5, label='Std')
             plt.vlines(high, height / 2 - height * 0.075, height / 2 + height * 0.075, color='limegreen', linewidth=5)
             plt.vlines(low, height / 2 - height * 0.075, height / 2 + height * 0.075, color='limegreen', linewidth=5)
-            plt.xlabel('Prediction', fontsize=36, fontweight='bold')
-            plt.ylabel('Num Trees', fontsize=36, fontweight='bold')
+            plt.xlabel('Prediction', fontsize=36)
+            plt.ylabel('Num Trees', fontsize=36)
 
-            plt.xticks([0, 0.5, 1, 1.5, 2, 2.5], fontsize=36, fontweight='bold')
-            plt.yticks([100, 200, 300], fontsize=36, fontweight='bold')
+            plt.xticks([0, 0.5, 1, 1.5, 2, 2.5], fontsize=36)
+            plt.yticks([100, 200, 300], fontsize=36)
             font = font_manager.FontProperties(
-                weight='bold',
                 style='normal', size=26)
             plt.legend(prop=font)
             if savefigure:
@@ -1840,12 +1887,12 @@ class eels_rf_setup():
         :return: none, shows plot
         """
         plt.figure(figsize=(8, 6))
-        plt.xticks([930, 950, 970], fontsize=32, fontweight='bold')
-        plt.yticks([0.0, 0.05, 0.1, 0.15], fontsize=32, fontweight='bold')
+        plt.xticks([930, 950, 970], fontsize=32)
+        plt.yticks([0.0, 0.05, 0.1, 0.15], fontsize=32)
         # plt.ylabel('Normalized Variance Reduction', fontsize=30)
-        plt.ylabel('Importance', fontsize=36, fontweight='bold')
-        plt.xlabel('Energy (eV)', fontsize=36, fontweight='bold')
-        plt.title('Feature Importances', fontsize=36, fontweight='bold')
+        plt.ylabel('Importance', fontsize=36)
+        plt.xlabel('Energy (eV)', fontsize=36)
+        plt.title('Feature Importances', fontsize=36)
 
         # extract and plot feature importances
         plt.plot(np.asarray(self.spectra_df.iloc[0][self.energy_col]),
@@ -1895,24 +1942,24 @@ class eels_rf_setup():
             # add solid green line showing RMSE
             plt.vlines(RMSE, max(hist[0]), min(hist[0]), color='limegreen', linewidth=5, label='RMSE')
             plt.text(RMSE + 0.25, max(hist[0]) - 0.1 * max(hist[0]), 'RMSE = ' + str(round(RMSE, 3)),
-                     horizontalalignment='left', fontsize=28, fontweight='bold')
-        plt.xticks([0.0, 0.4, 0.8, 1.2], fontsize=32, fontweight='bold')
+                     horizontalalignment='left', fontsize=28)
+        plt.xticks([0.0, 0.4, 0.8, 1.2], fontsize=32)
         if type(yticks) != list:
-            plt.yticks([0.0, 250, 500, 750], fontsize=32, fontweight='bold')
+            plt.yticks([0.0, 250, 500, 750], fontsize=32)
 
         else:
-            plt.yticks(yticks, fontsize=32, fontweight='bold')
+            plt.yticks(yticks, fontsize=32)
         # plt.ylabel('Normalized Variance Reduction', fontsize=30)
-        plt.ylabel('Frequency', fontsize=36, fontweight='bold')
-        plt.xlabel('Abs Error', fontsize=36, fontweight='bold')
+        plt.ylabel('Frequency', fontsize=36)
+        plt.xlabel('Abs Error', fontsize=36)
         # plt.title('Feature Importances ' + self.predicted_col, fontsize=22)
-        plt.title('Error Histogram', fontsize=36, fontweight='bold')
+        plt.title('Error Histogram', fontsize=36)
         if savefigure:
             plt.savefig('Error Histogram.pdf',  bbox_inches='tight', transparent=True)
         plt.show()
 
 
-    def show_mixture_samples_accuracy(self):
+    def show_mixture_samples_accuracy(self, savefigure = False):
         """
         Shows the R2 and RMSE plots for the integer samlpes that make up the generated mixed valent spectra
         :return: None, shows plot
@@ -1931,8 +1978,8 @@ class eels_rf_setup():
         error_df_mixtures = self.predict_set_of_spectra(mixture_df_slice)
 
         # show r2 and rmse
-        self.show_r2(error_df=error_df_mixtures)
-        self.show_errors_histogram(error_df=error_df_mixtures, yticks=[0, 50, 100, 150])
+        self.show_r2(error_df=error_df_mixtures, savefigure=savefigure)
+        self.show_errors_histogram(error_df=error_df_mixtures, yticks=[0, 50, 100, 150], savefigure=savefigure)
 
     def plot_errors_vs_std(self, scatter_spot_multiplier = 15):
         """
@@ -2030,7 +2077,7 @@ class eels_rf_setup():
             print(text)
             font = matplotlib.font_manager.FontProperties(size=32)
             text.set_font_properties(font)
-            cb.ax.set_yticklabels(fontsize=32, weight='bold')
+            cb.ax.set_yticklabels(fontsize=32)
 
             min_plot = round(min(error_df['Labels Test']) - 0.5, 0)
             max_plot = round(max(error_df['Labels Test']) + 1.5, 0)
@@ -2047,13 +2094,13 @@ class eels_rf_setup():
         # create scatter plot with points colored by average prediction std across the datapoints at that position
         plt.figure(figsize=(8, 6))
 
-        plt.xticks([0.0, 1.0, 2.0, 3.0], fontsize=32, fontweight='bold')
-        plt.yticks([0.0, 1.0, 2.0, 3.0], fontsize=32, fontweight='bold')
+        plt.xticks([0.0, 1.0, 2.0, 3.0], fontsize=32)
+        plt.yticks([0.0, 1.0, 2.0, 3.0], fontsize=32)
         # plt.ylabel('Normalized Variance Reduction', fontsize=30)
-        plt.ylabel('Predicted Valence', fontsize=36, fontweight='bold')
-        plt.xlabel('True Valence', fontsize=36, fontweight='bold')
+        plt.ylabel('Predicted Valence', fontsize=36)
+        plt.xlabel('True Valence', fontsize=36)
         # plt.title('Feature Importances ' + self.predicted_col, fontsize=22)
-        plt.title('Prediction vs True', fontsize=36, fontweight='bold')
+        plt.title('Prediction vs True', fontsize=36)
 
         min_plot = round(min(error_df['Labels Test']) - 0.5, 0)
         max_plot = round(max(error_df['Labels Test']) + 1.5, 0)
@@ -2064,10 +2111,10 @@ class eels_rf_setup():
         cb = plt.colorbar(label='Prediction Std', ticks = [0.1, 0.2, 0.3, 0.4, 0.5])
         ax = cb.ax
         text = ax.yaxis.label
-        font = matplotlib.font_manager.FontProperties(size=28, weight='bold')
+        font = matplotlib.font_manager.FontProperties(size=28)
         text.set_font_properties(font)
         for t in cb.ax.yaxis.get_ticklabels():
-            t.set_weight("bold")
+            # t.set_weight("bold")
             t.set_fontsize(32)
 
         if savefigure:
@@ -2267,30 +2314,30 @@ class eels_rf_setup():
         cb = plt.colorbar(sm, label='Fraction Test Set Predicted')
         ax = cb.ax
         text = ax.yaxis.label
-        font = matplotlib.font_manager.FontProperties(size=22, weight='bold')
+        font = matplotlib.font_manager.FontProperties(size=22)
         text.set_font_properties(font)
         for t in cb.ax.get_yticklabels():
             t.set_fontsize(22)
-            t.set_weight('bold')
+            # t.set_weight('bold')
 
-        plt.xticks(fontsize=22, fontweight = 'bold')
+        plt.xticks(fontsize=22)
         if len(yticks_to_use) == 0:
-            plt.yticks(fontsize=22, fontweight = 'bold')
+            plt.yticks(fontsize=22)
         else:
-            plt.yticks(yticks_to_use, fontsize = 22, fontweight = 'bold')
-        plt.xlabel('Std Cutoff', fontsize=22, fontweight = 'bold')
-        plt.ylabel('Accuracy (R^2)', fontsize=22, fontweight = 'bold')
-        plt.title('Std Cutoff Threshold vs Accuracy', fontsize=22, fontweight = 'bold')
+            plt.yticks(yticks_to_use, fontsize = 22)
+        plt.xlabel('Std Cutoff', fontsize=22)
+        plt.ylabel('Accuracy (R^2)', fontsize=22)
+        plt.title('Std Cutoff Threshold vs Accuracy', fontsize=22)
         plt.ylim(ylims)
         for i in range(0, len(r2s)):
             if show_type == 'percentage_predicted':
                 plt.text(thresholds[i], r2s[i] + text_height, str(round(percentage_predicted[i], 2)), horizontalalignment='center',
-                 fontsize=text_fontsize, fontweight = 'bold')
+                 fontsize=text_fontsize)
             if show_type == 'RMSE':
                 plt.text(thresholds[i], r2s[i] + text_height, str(round(rmse[i], 2)), horizontalalignment='center',
-                 fontsize=text_fontsize, fontweight = 'bold')
+                 fontsize=text_fontsize)
         if savefigure:
-            plt.savefig(show_type + 'bar_chart_with_colorbar.png', bbox_inches='tight')
+            plt.savefig(show_type + 'bar_chart_with_colorbar.pdf', bbox_inches='tight')
         plt.show()
 
     def augment_df_with_mixtures(self, len_mixtures=100, len_combinations=20):
@@ -2660,7 +2707,7 @@ def flatten(list1):
     return [item for sublist in list1 for item in sublist]
 def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies',
                        intensity_col='Spectrum', broadened_col=None, output_col_energy='Scaled Energy (eV)',
-                       output_col_intensity='Scaled Intensity', show_plot = False):
+                       output_col_intensity='Scaled Intensity', show_plot = False, savefigure = False):
     """
     Scale a set of spectra so they all start and end at the same point and have a constant energy resolution
     :param df_w_spectra: dataframe with the unscaled spectra (pandas dataframe)
@@ -2722,11 +2769,11 @@ def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies
 
         if show_plot:
             plt.plot(energy, intensity, label='Simulated Spectrum', linewidth=3)
-            plt.title('Illustration of Scaled Baseline', fontsize=22, fontweight = 'bold')
-            plt.xticks(fontsize=18, fontweight = 'bold')
-            plt.yticks(fontsize=18, fontweight = 'bold')
-            plt.xlabel('Energy (eV)', fontsize=20, fontweight = 'bold')
-            plt.ylabel('Intensity', fontsize=20, fontweight = 'bold')
+            plt.title('Baseline Illustration', fontsize=28)
+            plt.xticks(fontsize=24)
+            plt.yticks(fontsize=24)
+            plt.xlabel('Energy (eV)', fontsize=26)
+            plt.ylabel('Intensity', fontsize=26)
             # plt.plot(interp_energies_final, interped_intens, label = 'interpolated')
             # plt.legend(fontsize = 16)
             # plt.show()
@@ -2771,10 +2818,12 @@ def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies
             plt.plot(xf, ys, 'r', label="Fitted Baseline", linewidth=3)
             # plt.xlim([925, 940])
             plt.legend(fontsize=16)
-            plt.show()
             # print(ys - min(ys))
             # print(xf)
             # print(interp_energies)
+            if savefigure:
+                plt.savefig('Scaled Baseline Example.pdf', bbox_inches='tight',
+                            transparent=True)
             plt.show()
 
         interp_energies_rounded = [round(num, 1) for num in interp_energies_final]
@@ -2808,7 +2857,7 @@ def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies
 
     return df_w_spectra
 
-def build_L2_3(l3, l2, show_plot=True):
+def build_L2_3(l3, l2, show_plot=True, savefigure = False):
 
     """
     Builds and L2,3 spectrum from inputted L2 and L3 spectra
@@ -2876,12 +2925,15 @@ def build_L2_3(l3, l2, show_plot=True):
         plt.plot(L3_energies, interped_l3, label='L3', linewidth = 3)
         plt.plot(full_energies_final[0:len(L3_energies)], full_intens[0:len(L3_energies)], label='L2', linewidth = 3)
         plt.plot(L3_energies, L2_3, label='L2,3', linewidth = 3)
-        plt.xticks(fontsize=18, fontweight = 'bold')
-        plt.yticks(fontsize=18, fontweight = 'bold')
-        plt.legend(fontsize=14)
-        plt.xlabel('Energy (eV)', fontsize = 20, fontweight = 'bold')
-        plt.ylabel('Intensity', fontsize = 20, fontweight = 'bold')
-        plt.title('L2, L3, L2,3 For mp-30 (Cu(0))', fontsize=22, fontweight = 'bold')
+        plt.xticks(fontsize=24)
+        plt.yticks(fontsize=24)
+        plt.legend(fontsize=18)
+        plt.xlabel('Energy (eV)', fontsize = 26)
+        plt.ylabel('Intensity', fontsize = 26)
+        plt.title('L$_2$, L$_3$, L$_2$,$_3$ For mp-30 (Cu(0))', fontsize=28)
+        if savefigure:
+            plt.savefig('L2,3 example.pdf', bbox_inches='tight',
+                        transparent=True)
         plt.show()
 
     L3_energies_rounded = []
@@ -2925,11 +2977,11 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
 
 
             if vis == 'R2':
-                plt.title('R2 vs Noise', fontsize = 36, fontweight='bold')
-                plt.xlabel('Noise STD', fontsize = 36, fontweight='bold')
-                plt.ylabel('R2', fontsize = 36, fontweight='bold')
-                plt.xticks([0,0.1, 0.2], fontsize = 36, fontweight='bold')
-                plt.yticks([0.3,0.6,0.9], fontsize = 36, fontweight='bold')
+                plt.title('R2 vs Noise', fontsize = 36)
+                plt.xlabel('Noise STD', fontsize = 36)
+                plt.ylabel('R2', fontsize = 36)
+                plt.xticks([0,0.1, 0.2], fontsize = 36)
+                plt.yticks([0.3,0.6,0.9], fontsize = 36)
                 plt.ylim([0.28, 0.95])
                 plt.xlim([-0.01, 0.225])
                 plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
@@ -2947,11 +2999,11 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                              linewidth = 4, label = str(interp_ranges[count]))
 
             if vis == 'RMSE':
-                plt.title('RMSE vs Noise', fontsize = 36, fontweight='bold')
-                plt.xlabel('Noise STD', fontsize = 36, fontweight='bold')
-                plt.ylabel('RMSE', fontsize = 36, fontweight='bold')
-                plt.xticks([0,0.1, 0.2], fontsize = 36, fontweight='bold')
-                plt.yticks([0.2,0.35,0.5], fontsize = 36, fontweight='bold')
+                plt.title('RMSE vs Noise', fontsize = 36)
+                plt.xlabel('Noise STD', fontsize = 36)
+                plt.ylabel('RMSE', fontsize = 36)
+                plt.xticks([0,0.1, 0.2], fontsize = 36)
+                plt.yticks([0.2,0.35,0.5], fontsize = 36)
                 plt.ylim([0.19, 0.525])
                 plt.xlim([-0.01, 0.225])
                 plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
