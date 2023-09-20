@@ -275,7 +275,7 @@ class eels_rf_setup():
                     self.spectra_df.loc[self.spectra_df.mpid_string == 'mp-1692']['TEAM_1_aligned_925_970'])
 
         if compare_to_lit:
-            plt.plot(np.asarray(energies) - lit_shift, broadened_intens, label='Liturature XAS', linewidth=3,
+            plt.plot(np.asarray(energies) + lit_shift, broadened_intens, label='Liturature XAS', linewidth=3,
                      color='#1f77b4')
 
         if show_feff:
@@ -3009,9 +3009,11 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.xlabel('Noise STD', fontsize = 36)
                 plt.ylabel('R$^2$', fontsize = 36)
                 plt.xticks([0,0.1, 0.2], fontsize = 36)
-                plt.yticks([0.3,0.6,0.9], fontsize = 36)
-                plt.ylim([0.28, 0.95])
+                plt.yticks([0.5,0.7,0.9], fontsize = 36)
+                plt.ylim([0.45, 0.95])
                 plt.xlim([-0.01, 0.225])
+                print('R2s')
+                print(mean_01, mean_05, mean_1, mean_2)
                 plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
 
                 if show_err:
@@ -3031,9 +3033,11 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.xlabel('Noise STD', fontsize = 36)
                 plt.ylabel('RMSE', fontsize = 36)
                 plt.xticks([0,0.1, 0.2], fontsize = 36)
-                plt.yticks([0.2,0.35,0.5], fontsize = 36)
-                plt.ylim([0.18, 0.525])
+                plt.yticks([0.2,0.3,0.4], fontsize = 36)
+                plt.ylim([0.18, 0.45])
                 plt.xlim([-0.01, 0.225])
+                print('RMSEs')
+                print(mean_01, mean_05, mean_1, mean_2)
                 plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
 
                 if show_err:
