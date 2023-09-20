@@ -76,7 +76,7 @@ class eels_rf_setup():
         for random_seed in np.linspace(0, num_random_seeds-1, num_random_seeds): # runs the following analysis over
             # the number of specified random seeds
             random_seed = int(random_seed)
-
+            print(random_seed)
             for std in stds:
                 noisy_test = []
                 interp_spec = np.asarray(self.rf_error_df[column])
@@ -640,7 +640,7 @@ class eels_rf_setup():
                                   spectra_type = 'csv', cumulative_spec = True,
                                   theory_column = 'XAS_aligned_925_970', energies_range = [925,970], show_hist = False,
                                   show_plots = False, show_inputted_spectrum=False, print_details = False,
-                                  savefigure = False):
+                                  savefigure = False, theory_indicies = []):
         """
         Wrapper function for predicting all XAS/EELS spectra in a folder. All spectra in that folder must be of the
         same file type (ie csv or dm4). This function calls the 'predict_experiment_random_forest' function for each
@@ -681,7 +681,7 @@ class eels_rf_setup():
                             print('Energy Axis Shift = ' + str(shift))
                             print('Smoothing Parameters = ' + str(smooth))
                         if 'Cu Metal' in path:
-                            self.predict_experiment_random_forest(path, 1640, 'Cu Metal',
+                            self.predict_experiment_random_forest(path, theory_indicies[0], 'Cu Metal',
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
                                                                   points_to_average=edge,
@@ -696,7 +696,7 @@ class eels_rf_setup():
                                                                   savefigure=savefigure)
 
                         elif 'Cu2O' in path:
-                            self.predict_experiment_random_forest(path, 2240, 'Cu2O',
+                            self.predict_experiment_random_forest(path, theory_indicies[1], 'Cu2O',
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
                                                                   points_to_average=edge,
@@ -711,7 +711,7 @@ class eels_rf_setup():
                                                                   savefigure=savefigure)
 
                         elif 'CuO' in path:
-                            self.predict_experiment_random_forest(path, 2191, 'CuO',
+                            self.predict_experiment_random_forest(path, theory_indicies[2], 'CuO',
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
                                                                   points_to_average=edge,
@@ -726,7 +726,7 @@ class eels_rf_setup():
                                                                   savefigure=savefigure)
 
                         else:
-                            self.predict_experiment_random_forest(path, 1640, 'Unlabeled Cu',
+                            self.predict_experiment_random_forest(path, 1644, 'Unlabeled Cu',
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
                                                                   points_to_average=edge,
@@ -966,7 +966,7 @@ class eels_rf_setup():
 
         self.mixed_valent_pred.append([self.prediction, self.prediction_std, self.true_val])
 
-    def predict_Cu_non_integers(self, cu_metal=1, cu2o=0, cuo=0, cu_int_indicies = (1640, 1471, 3011),
+    def predict_Cu_non_integers(self, cu_metal=1, cu2o=0, cuo=0, cu_int_indicies = (),
                                 show_standards = False, show_plots = False, energy_col ='new Scaled Energies use',
                                 theory_col = 'TEAM_1_aligned_925_970',
                                 predict_col = 'Cumulative_Spectra_TEAM_1_aligned_925_970',
@@ -1119,24 +1119,28 @@ class eels_rf_setup():
         first_comp = list(np.linspace(1, 0, 51))
         second_comp = list(np.linspace(0, 1, 51))
 
+        cu_metal_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-30'].index[0]
+        cu2o_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-361'].index[0]
+        cuo_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-704645'].index[0]
+
         if catagory == '0-1':
             # if mixtures of 0 and 1 fix Cu(II) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
-                self.predict_Cu_non_integers(first_comp[i], second_comp[i], 0, cu_int_indicies=(1640, 2240, 824))
+                self.predict_Cu_non_integers(first_comp[i], second_comp[i], 0, cu_int_indicies=(cu_metal_index, cu2o_index, cuo_index))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(0) to Cu(I)', fontsize=23)
 
         elif catagory == '1-2':
             # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
-                self.predict_Cu_non_integers(0, first_comp[i], second_comp[i], cu_int_indicies=(1640, 2240, 824))
+                self.predict_Cu_non_integers(0, first_comp[i], second_comp[i], cu_int_indicies=(cu_metal_index, cu2o_index, cuo_index))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(I) to Cu(II)', fontsize=23)
 
         elif catagory == '0-2':
             # if mixtures of 0 and 2 fix Cu(I) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
-                self.predict_Cu_non_integers(first_comp[i], 0, second_comp[i], cu_int_indicies=(1640, 2240, 824))
+                self.predict_Cu_non_integers(first_comp[i], 0, second_comp[i], cu_int_indicies=(cu_metal_index, cu2o_index, cuo_index))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(0) to Cu(II)', fontsize=23)
 
@@ -1202,7 +1206,7 @@ class eels_rf_setup():
             # spectra than it does on integers and, as described in the manuscript, we believe the prediction of 0.3
             # for the Cu metal spectrum is more accurate than its nominal label of zero.
             for i in range(0, len(first_comp)):
-                trues.append(first_comp[i] * 0.31 + second_comp[i] * 1.08)
+                trues.append(first_comp[i] * 0.3 + second_comp[i] * 1.07)
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
             plt.figure(figsize=(8, 7))
             plt.title('Experimental Cu(0) to Cu(I)', fontsize=26)
@@ -1218,7 +1222,7 @@ class eels_rf_setup():
                                                                  smoothing_params=smoothing_params)
             trues = []
             for i in range(0, len(first_comp)):
-                trues.append(first_comp[i] * 1.08 + second_comp[i] * 1.99)
+                trues.append(first_comp[i] * 1.07 + second_comp[i] * 2.12)
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
             plt.figure(figsize=(8, 7))
             plt.title('Experimental Cu(I) to Cu(II)', fontsize=26)
@@ -1328,12 +1332,12 @@ class eels_rf_setup():
 
                 if mat == 'CuO':
                     cb = plt.colorbar(sc, label='Prediction Std')
-                    cb.set_ticks(np.linspace(round(min_std-0.05,1), round(max_std+0.05, 1), 5))
+                    cb.set_ticks(np.linspace(round(min_std-0.05,1), round(max_std+0.05, 1), 4))
                     ax = cb.ax
                     text = ax.yaxis.label
                     font = matplotlib.font_manager.FontProperties(size=36)
                     text.set_font_properties(font)
-                    cb.ax.set_yticklabels([0.1, 0.3, 0.5, 0.7, 0.9], fontsize=36)
+                    cb.ax.set_yticklabels([0.1, 0.3, 0.5, 0.7], fontsize=36)
 
 
                 # if mat == 'CuO':
@@ -1446,7 +1450,7 @@ class eels_rf_setup():
                 else:
                     plt.legend(fontsize=23.25)
                 cb = plt.colorbar(sc, label='Prediction Std')
-                cb.set_ticks([0.1, 0.25, 0.4, 0.55])
+                cb.set_ticks([0.15, 0.3, 0.45])
                 ax = cb.ax
                 text = ax.yaxis.label
                 font = matplotlib.font_manager.FontProperties(size=26)
@@ -2627,7 +2631,11 @@ class eels_rf_setup():
 
         # drop the stable forms of Cu metal, Cu2O and CuO to ensure validation experimental spectra aren't baised
         # by having these in the training set
-        self.spectra_df_no_oxides = self.spectra_df.drop([1640, 2240, 824])
+        cu_metal_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-30'].index[0]
+        cu2o_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-361'].index[0]
+        cuo_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-704645'].index[0]
+
+        self.spectra_df_no_oxides = self.spectra_df.drop([cu_metal_index, cu2o_index, cuo_index])
         # self.spectra_df_no_oxides = self.spectra_df
         self.spectra_df_no_oxides = self.spectra_df_no_oxides.reset_index()
 
@@ -3004,18 +3012,18 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.yticks([0.3,0.6,0.9], fontsize = 36)
                 plt.ylim([0.28, 0.95])
                 plt.xlim([-0.01, 0.225])
-                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
+                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
 
                 if show_err:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], color = 'k')
-                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2], color = 'k')
+                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
                                  ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
                     eb1[-1][0].set_linestyle(':')
                     if savefigure:
                         plt.savefig('R2 Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
 
                 else:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.88, mean_01, mean_05, mean_1, mean_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2],
                              linewidth = 4, label = str(interp_ranges[count]))
 
             if vis == 'RMSE':
@@ -3024,20 +3032,20 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.ylabel('RMSE', fontsize = 36)
                 plt.xticks([0,0.1, 0.2], fontsize = 36)
                 plt.yticks([0.2,0.35,0.5], fontsize = 36)
-                plt.ylim([0.19, 0.525])
+                plt.ylim([0.18, 0.525])
                 plt.xlim([-0.01, 0.225])
-                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
+                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
 
                 if show_err:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], color = 'k')
-                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2], color = 'k')
+                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
                                  ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
                     eb1[-1][0].set_linestyle(':')
                     if savefigure:
                         plt.savefig('RMSE Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
 
                 else:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.214, mean_01, mean_05, mean_1, mean_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2],
                              linewidth = 4, label = str(interp_ranges[count]))
         if show_err == False:
             plt.legend(fontsize = 22, title="Sampling Interval (eV)", title_fontsize = 22)
