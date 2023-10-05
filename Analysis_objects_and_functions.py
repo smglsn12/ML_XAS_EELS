@@ -51,7 +51,7 @@ class eels_rf_setup():
         self.spectra_df = joblib.load(self.spectra_df_filepath)
 
     def full_noise_setup(self, column, energy_col, interp_range, smoothing_window, filename=None, show_plots=False,
-                         baseline_subtract=False, stds = (1000, 500, 100, 50), num_random_seeds = 100):
+                         baseline_subtract=False, stds = (1000, 200, 100, 50), num_random_seeds = 100):
         """
         This function takes test set spectra, adds poisson noise to them at a specified set of standard deviations, and
         computes this over a series of random states for each standard deviation. At each unique set of spectra, the
@@ -106,7 +106,7 @@ class eels_rf_setup():
                     if show_plots:
                         if count_1 == 0:
                             plt.plot(self.rf_error_df.iloc[0][energy_col], noisy_spec)
-                            plt.title('add noise original')
+                            plt.title('Add Noise Original', fontsize=18)
                             plt.show()
                             count_1 += 1
 
@@ -124,17 +124,17 @@ class eels_rf_setup():
                     if count == 0:
                         plt.plot(interp_energies_final[0:100], noisy_spec[0:100])
                         plt.plot(energy[0:30], smoothed_spec[0:30])
-                        plt.title('Zoom in on baseline')
+                        plt.title('Zoom in on baseline', fontsize = 18)
                         plt.show()
 
                         plt.figure(figsize=(8, 7))
-                        plt.xlabel('Energy (eV)', fontsize=36, fontweight='bold')
-                        plt.ylabel(' Intensty', fontsize=36, fontweight='bold')
-                        plt.xticks([930, 950, 970], fontsize=36, fontweight='bold')
-                        plt.yticks([0, 0.5, 1, 1.5], fontsize=36, fontweight='bold')
+                        plt.xlabel('Energy (eV)', fontsize=36)
+                        plt.ylabel(' Intensty', fontsize=36)
+                        plt.xticks([930, 950, 970], fontsize=36)
+                        plt.yticks([0, 0.5, 1, 1.5], fontsize=36)
                         plt.plot(self.rf_error_df.iloc[0][energy_col], noisy_test[0], linewidth=3,
                                  label='Noisy Spec')
-                        plt.title('Add Noise std = ' + str(std), fontsize=36, fontweight='bold')
+                        plt.title('Add Noise std = ' + str((1/std)*10), fontsize=36)
                         # plt.show()
                         plt.plot(energy, smooth_interp_spec[0], linewidth=3, label='Smoothed')
                         # plt.title('Smooth Using Same Window As Exp', fontsize = 18)
@@ -2053,7 +2053,8 @@ class eels_rf_setup():
         plt.figure(figsize=(8, 7))
         plt.show()
 
-    def show_r2(self, scatter_spot_multiplier = 15, savefigure=False, error_df = None, show_value_counts_plot = False):
+    def show_r2(self, scatter_spot_multiplier = 15, savefigure=False, error_df = None, show_value_counts_plot = False,
+                include_integer=True):
         """
         Show the R2 plot for a set of predictions. Predictions and true oxidation states are rounded to the nearest 0.1.
         Scatter plot sizes are scaled to the number of data points at that point and are colored by the average
@@ -2079,17 +2080,37 @@ class eels_rf_setup():
         condensed_stds = []
         # extract predictions and labels and round them to 0.1
         for i in np.asarray(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts().index):
-            pred.append(round(i[0], 1))
-            true.append(round(i[1], 1))
-            condensed_stds.append(np.mean(error_df.loc[
-                                              (error_df['Predictions Rounded'] == round(i[0], 1)) & (
-                                                      error_df['Labels Test Rounded'] == round(i[1], 1))][
-                                              'Predictions Std']))
-        for k in np.asarray(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts()):
-            count.append(k)
+            if include_integer==False:
+                if round(i[1], 1) in [0.0,1.0,2.0]:
+                    pass
+                else:
+                    pred.append(round(i[0], 1))
+                    true.append(round(i[1], 1))
+                    condensed_stds.append(np.mean(error_df.loc[
+                                                      (error_df['Predictions Rounded'] == round(i[0], 1)) & (
+                                                              error_df['Labels Test Rounded'] == round(i[1], 1))][
+                                                      'Predictions Std']))
+            else:
+                pred.append(round(i[0], 1))
+                true.append(round(i[1], 1))
+                condensed_stds.append(np.mean(error_df.loc[
+                                                  (error_df['Predictions Rounded'] == round(i[0], 1)) & (
+                                                          error_df['Labels Test Rounded'] == round(i[1], 1))][
+                                                  'Predictions Std']))
 
+        for i in np.asarray(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts().index):
+            if include_integer == False:
+                if round(i[1], 1) in [0.0, 1.0, 2.0]:
+                    pass
+                else:
+                    count.append(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts()[i])
+            else:
+                count.append(error_df[['Predictions Rounded', 'Labels Test Rounded']].value_counts()[i])
+
+        print(len(count))
+        print(len(pred))
         count = np.asarray(count)
-
+        print(count)
         if show_value_counts_plot:
             # create scatter plot with points colored by number of datapoints at that position
             plt.figure(figsize=(8, 6))
@@ -2994,12 +3015,12 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
         for noise_df in noise_dfs:
             count += 1
             mean_01 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 1000][vis]))
-            mean_05 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 500][vis]))
+            mean_05 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 200][vis]))
             mean_1 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 100][vis]))
             mean_2 = np.mean(np.asarray(noise_df.loc[noise_df['noise_std'] == 50][vis]))
 
             std_01 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 1000][vis]))
-            std_05 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 500][vis]))
+            std_05 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 200][vis]))
             std_1 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 100][vis]))
             std_2 = np.std(np.asarray(noise_df.loc[noise_df['noise_std'] == 50][vis]))
 
@@ -3009,8 +3030,8 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.xlabel('Noise STD', fontsize = 36)
                 plt.ylabel('R$^2$', fontsize = 36)
                 plt.xticks([0,0.1, 0.2], fontsize = 36)
-                plt.yticks([0.5,0.7,0.9], fontsize = 36)
-                plt.ylim([0.45, 0.95])
+                plt.yticks([0.3,0.6,0.9], fontsize = 36)
+                plt.ylim([0.28, 0.95])
                 plt.xlim([-0.01, 0.225])
                 print('R2s')
                 print(mean_01, mean_05, mean_1, mean_2)
@@ -3033,23 +3054,23 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.xlabel('Noise STD', fontsize = 36)
                 plt.ylabel('RMSE', fontsize = 36)
                 plt.xticks([0,0.1, 0.2], fontsize = 36)
-                plt.yticks([0.2,0.3,0.4], fontsize = 36)
-                plt.ylim([0.18, 0.45])
+                plt.yticks([0.2,0.35,0.5], fontsize = 36)
+                plt.ylim([0.18, 0.525])
                 plt.xlim([-0.01, 0.225])
                 print('RMSEs')
                 print(mean_01, mean_05, mean_1, mean_2)
-                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
+                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
 
                 if show_err:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2], color = 'k')
-                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2], color = 'k')
+                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
                                  ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
                     eb1[-1][0].set_linestyle(':')
                     if savefigure:
                         plt.savefig('RMSE Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
 
                 else:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.196, mean_01, mean_05, mean_1, mean_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2],
                              linewidth = 4, label = str(interp_ranges[count]))
         if show_err == False:
             plt.legend(fontsize = 22, title="Sampling Interval (eV)", title_fontsize = 22)
