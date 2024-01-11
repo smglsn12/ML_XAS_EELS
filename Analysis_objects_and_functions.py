@@ -1578,6 +1578,7 @@ class eels_rf_setup():
                     # noise.append(np.random.normal(0, 50, size=1)[0])
                 # plt.plot(energies, noise, label = 'Noise')
                 plt.plot(energies, intens, zorder=10)
+                plt.xlim([910,975])
                 # intens = np.asarray(intens) + np.asarray(noise)
                 # plt.plot(energies, intens, label = 'Summed w/Noise')
                 if save_all_figures:
@@ -1627,6 +1628,7 @@ class eels_rf_setup():
                     # noise.append(np.random.normal(0, 50, size=1)[0])
                 # plt.plot(energies, noise, label = 'Noise')
                 plt.plot(energies, intens, zorder=10)
+                plt.xlim([910,975])
                 # intens = np.asarray(intens) + np.asarray(noise)
                 # plt.plot(energies, intens, label = 'Summed w/Noise')
                 plt.show()
@@ -1647,6 +1649,7 @@ class eels_rf_setup():
         if show_plots:
             plt.figure(figsize=(8, 7))
             plt.xticks([900, 920, 940, 960, 980], fontsize=36)
+            plt.xlim([910, 975])
             plt.yticks(fontsize=36)
             plt.ylabel('Intensity', fontsize=36)
             plt.xlabel('Energy (eV)', fontsize=36)
@@ -1671,6 +1674,7 @@ class eels_rf_setup():
             plt.plot(self.interped_energies, self.interped_intens / max(self.interped_intens),
                      label='Experimental Spectrum', linewidth=3, zorder=10)
             plt.xticks([900, 920, 940, 960, 980], fontsize=36)
+            plt.xlim([910, 975])
             plt.yticks(fontsize=36)
             plt.ylabel('Intensity', fontsize=36)
             plt.xlabel('Energy (eV)', fontsize=36)
@@ -1787,8 +1791,8 @@ class eels_rf_setup():
             # plt.ylabel('Intensity', fontsize = 36)
             # plt.xticks([930, 950, 970], fontsize=36)
             # plt.yticks([0, 0.5, 1], fontsize=36, fontweight='bold')
-            plt.yticks([], fontsize = 36)
-            plt.xticks([])
+            # plt.yticks([], fontsize = 36)
+            # plt.xticks([])
             # plt.title('Cumulative Spectrum', fontsize=36)
 
             # self.intensities_final = self.intensities_final - min(self.intensities_final)
