@@ -21,7 +21,9 @@ from tabulate import tabulate
 from scipy import interpolate
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import scipy
-
+from tqdm import tqdm
+from pathlib import Path
+from sklearn.multioutput import MultiOutputRegressor
 
 
 class eels_rf_setup():
@@ -642,7 +644,7 @@ class eels_rf_setup():
                                   show_plots = False, show_inputted_spectrum=False, print_details = False,
                                   savefigure = False, theory_indicies = [], baseline_subtract_csv=True,
                                   prediction_type = 'Mean',
-                                  model_type = 'regression'):
+                                  model_type = 'regression', check_alignment = False):
         """
         Wrapper function for predicting all XAS/EELS spectra in a folder. All spectra in that folder must be of the
         same file type (ie csv or dm4). This function calls the 'predict_experiment_random_forest' function for each
@@ -698,7 +700,8 @@ class eels_rf_setup():
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
                                                                   baseline_subtract_csv = baseline_subtract_csv,
-                                                                  prediction_type=prediction_type)
+                                                                  prediction_type=prediction_type,
+                                                                  check_alignment = check_alignment)
 
                         elif 'Cu2O' in path:
                             self.predict_experiment_random_forest(path, theory_indicies[1], 'Cu2O',
@@ -716,7 +719,8 @@ class eels_rf_setup():
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
                                                                   baseline_subtract_csv = baseline_subtract_csv,
-                                                                  prediction_type=prediction_type)
+                                                                  prediction_type=prediction_type,
+                                                                  check_alignment = check_alignment)
 
                         elif 'CuO' in path:
                             self.predict_experiment_random_forest(path, theory_indicies[2], 'CuO',
@@ -734,10 +738,13 @@ class eels_rf_setup():
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
                                                                   baseline_subtract_csv = baseline_subtract_csv,
-                                                                  prediction_type=prediction_type)
+                                                                  prediction_type=prediction_type,
+                                                                  check_alignment = check_alignment)
 
                         else:
-                            self.predict_experiment_random_forest(path, 1644, 'Unlabeled Cu',
+                            p = Path(path)
+                            name = p.parts[0]
+                            self.predict_experiment_random_forest(path, theory_indicies[0], name,
                                                                   model_type=model_type,
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
@@ -752,7 +759,8 @@ class eels_rf_setup():
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
                                                                   baseline_subtract_csv = baseline_subtract_csv,
-                                                                  prediction_type=prediction_type)
+                                                                  prediction_type=prediction_type,
+                                                                  check_alignment = check_alignment)
 
 
                         predictions_set.append(
@@ -799,13 +807,15 @@ class eels_rf_setup():
                                              show_predicted_spectrum = True,
                                  show_plots = False, print_predictions = False,
                                 folder_path = 'C:/Users/smgls/Materials_database/Cu_deconvolved_spectra',
+                                folder_path_type = 'TEAM I',
                                 smoothing_params = [51,3],
                                 energies_range = [925, 970],
                                 exp_scale = 0.1,
                                 exp_broadening = None,
                                 show_hists = True,
                                              true_val_from_label = None,
-                                             prediction_type = 'Categorical'):
+                                             prediction_type = 'Categorical',
+                                             spectrum_shift = 0.0):
         """
         Generates an experimental mixed valent spectrum for a set of integer valent ratios and predicts that spectrum.
         Generates both raw spectrum and cumulative spectrum but only predicts the cumulative spectrum
@@ -822,14 +832,19 @@ class eels_rf_setup():
         :param exp_scale: energy axis scale for the experimental spectrum (float)
         :return: predicts mixed valent spectrum and stores its predictions in 'mixed_valent_pred'
         """
-
+        self.spectrum_energy_shift = spectrum_shift
         cu_metal = float(cu_metal)
         cu2o = float(cu2o)
         cuo = float(cuo)
         self.smoothing_params = smoothing_params
         cu_fractions = [cu_metal, cu2o, cuo]
-        # true_val = (cu_metal*0 + cu2o*1 + cuo*2)/sum(cu_fractions)
-        true_val = cu_metal*true_val_from_label[0] + cu2o*true_val_from_label[1] + cuo*true_val_from_label[2]
+        cu_fractions = np.asarray([cu_metal, cu2o, cuo])/sum(cu_fractions)
+        true_val = (cu_fractions[0]*true_val_from_label[0] + cu_fractions[1]*true_val_from_label[1] +
+                    cu_fractions[2]*true_val_from_label[2])
+        # print(cu_fractions, true_val)
+        # print(true_val)
+        # true_val = cu_metal*true_val_from_label[0] + cu2o*true_val_from_label[1] + cuo*true_val_from_label[2]
+        # print(true_val)
         paper_paths = glob.glob(folder_path + '/*')
 
         # print(paper_paths)
@@ -839,9 +854,19 @@ class eels_rf_setup():
         # functions. First smooth spectra, then scale to 0.1 eV, then crop to 925-970 eV energy range
         for exp_spectrum in paper_paths:
             # load spectrum
-            output = nio.dm.dmReader(exp_spectrum)
-            intens = output['data']
-            energies = output['coords'][0]
+            if folder_path_type == 'TEAM I':
+                output = nio.dm.dmReader(exp_spectrum)
+                intens = output['data']
+                energies = output['coords'][0]
+
+            if folder_path_type == 'csv':
+                output = pd.read_csv(exp_spectrum)
+                # Baseline subtract spectrum. This is because the csv file used in this work is extracted from literature
+                # and its baseline is far above zero due to the axes of the literature extraction.
+                # TODO This will need to be updated before broad use with csv data is possible
+                intens_temp = output['Intensity'] - min(output['Intensity'])
+                intens = intens_temp / intens_temp[len(intens_temp) - 5]
+                energies = output['Energy (eV)']
 
             # plt.figure(figsize=(8, 7))
             if show_plots:
@@ -858,7 +883,10 @@ class eels_rf_setup():
 
 
             # smooth spectrum
+            # plt.plot(energies, intens)
             intens = savgol_filter(intens, self.smoothing_params[0], self.smoothing_params[1])
+            # plt.plot(energies, intens)
+            plt.show()
 
             if show_plots:
                 plt.xticks(fontsize=18)
@@ -875,9 +903,48 @@ class eels_rf_setup():
             # scale to 0.1 eV spacing
             self.scale_experimental_spectra(intens, energies, scale = exp_scale)
 
-            if exp_broadening != None:
-                self.interped_intens = self.broaden_spec(self.interped_energies, self.interped_intens,
-                                                           exp_broadening, self.interped_energies, exp_broadening)
+            # shift spectrum if inputted
+            if self.spectrum_energy_shift != 0.0:
+                diff = self.spectrum_energy_shift * 10  # will need a factor of 10 more points than the inputted shift
+                # due to the 0.1 eV spacing. For example, to shift 0.2 eV that would require two additional points
+                spectrum_use = list(self.interped_intens)
+                energies_use = list(energies)
+                energies_min = 924.9
+                energies_max = max(energies_use)
+                if diff > 0:
+                    # to shift in the positive direction, keep energy axis fixed but add zeros to the low energy edge and
+                    # knock off points at the end. NOTE if the experimental spectrum starts well before 925, this shifting
+                    # procedure will not result in a line of meaningless zeros in the low energy edge. Instead, the lower
+                    # energy region of the inputted spectrum will just be shifted upwards
+                    points_to_add = np.zeros((int(diff)))
+                    for point in points_to_add:
+                        spectrum_use.insert(0, point)
+                        energies_use.insert(0, energies_min)
+                        energies_min = round(energies_min - 0.1, 1)
+                    spectrum_use = spectrum_use[0:len(self.interped_intens)]
+                if diff < 0:
+                    # to shift in the negative direction, add points to the end of the spectrum and knock points off in the
+                    # beginning. The points added at the end are an average of the last 20 points in the spectrum. Similar
+                    # to the case outlined above, this approach will not result in generating meaningless features at the
+                    # high energy edge of the spectrum if the high energy point of the inputted spectrum is higher than
+                    # 970 eV
+                    points_to_add = np.zeros((int(np.abs(diff))))
+                    intens_max = np.mean(spectrum_use[len(spectrum_use) - 10:len(spectrum_use)])
+                    for point in points_to_add:
+                        energies_max = round(energies_max + 0.1, 1)
+                        spectrum_use.append(intens_max)
+                        energies_use.append(energies_max)
+
+                    spectrum_use = spectrum_use[int(np.abs(diff)):len(spectrum_use)]
+
+                spectrum_use = np.asarray(spectrum_use)
+                # scale spectrum so it's normalized to high energy tail (this no longer means anything for the cumulative
+                # spectrum prediction, since those are normalized to one, but it is still helpful for visualization and
+                # comparison to other spectra, so this operation is still performed)
+                self.interped_intens = spectrum_use / np.mean(
+                    spectrum_use[len(spectrum_use) - 10:len(spectrum_use)])
+
+
 
             # crop to 925-970 eV range
             self.final_energies = np.arange(energies_range[0], energies_range[1] + 0.2, 0.1)[
@@ -962,13 +1029,13 @@ class eels_rf_setup():
         # predict mixture spectrum and extract predictions for each decision tree
         pred = self.rf_model.predict([np.asarray(self.mixed_cum_spec)])
         # print(pred)
-        predictions_full = []
+        predictions_full_temp = []
         trees = self.rf_model.estimators_
         for tree in trees:
-            predictions_full.append(tree.predict([np.asarray(self.mixed_cum_spec)]))
+            predictions_full_temp.append(tree.predict([np.asarray(self.mixed_cum_spec)]))
 
 
-        predictions_full = np.asarray(predictions_full).T[0]
+        predictions_full = np.asarray(predictions_full_temp).T[0]
         if prediction_type == 'Regression':
             median_pred = np.median(predictions_full)
             predictions_std = np.std(predictions_full)
@@ -988,6 +1055,12 @@ class eels_rf_setup():
             if prediction_type == 'Regression':
                 print('Prediction Median = ' + str(round(median_pred, 2)))
             print('prediction std = ' + str(round(predictions_std, 2)))
+
+        # print('mean')
+        # print(pred[0])
+        # print('median')
+        # print([np.median(np.asarray(predictions_full_temp).T[0][0]), np.median(np.asarray(predictions_full_temp).T[1][0]),
+        #        np.median(np.asarray(predictions_full_temp).T[2][0])])
 
         if show_hists:
             if prediction_type == 'Regression':
@@ -1012,13 +1085,13 @@ class eels_rf_setup():
                 plt.vlines(high, height / 2 - height * 0.075, height / 2 + height * 0.075, color='limegreen', linewidth=5)
                 plt.vlines(low, height / 2 - height * 0.075, height / 2 + height * 0.075, color='limegreen', linewidth=5)
 
-                plt.title('Prediction Histogram Mixed Valence', fontsize = 26)
+                plt.title('Prediction Histogram', fontsize = 26)
 
                 plt.xticks(fontsize=18)
                 plt.yticks(fontsize=18)
                 plt.xlabel('Prediction', fontsize=20)
                 plt.ylabel('Count', fontsize=20)
-                plt.legend(fontsize = 16, loc='center left', bbox_to_anchor=(1, 0.5))
+                # plt.legend(fontsize = 16, loc='center left', bbox_to_anchor=(1, 0.5))
                 # plt.plot(np.arange(0,max(errors),0.1), np.arange(0,max(errors),0.1), color = 'k', linewidth = 3, linestyle = '--')
                 plt.show()
 
@@ -1057,12 +1130,23 @@ class eels_rf_setup():
 
 
         if prediction_type == 'Regression':
-            self.prediction_mean = round(pred[0], 2)
-            self.prediction_median = round(median_pred, 2)
-            self.prediction_std = round(predictions_std, 2)
+            # try:
+            pred_ag = pred[0][0]*0 + pred[0][1]*1 + pred[0][2]*2
+            self.prediction_mean = round(pred_ag, 2)
+            # self.prediction_mean = round(pred[0], 2)
+
+            self.prediction_median = round(np.median(np.asarray(predictions_full_temp).T[0][0]), 2)
+
+            std = np.mean([np.std(np.asarray(predictions_full_temp).T[0][0]),
+                                        np.std(np.asarray(predictions_full_temp).T[1][0]),
+                                        np.std(np.asarray(predictions_full_temp).T[2][0])])
+            self.prediction_std = round(std, 2)
             self.true_val = true_val
 
-            self.mixed_valent_pred.append([self.prediction_mean, self.prediction_median, self.prediction_std, self.true_val])
+            self.mixed_valent_pred.append([self.prediction_mean, self.prediction_median,
+                                           self.prediction_std, self.true_val])
+            # except:
+                # pass
 
     def predict_Cu_non_integers(self, cu_metal=1, cu2o=0, cuo=0, cu_int_indicies = (),
                                 show_standards = False, show_plots = False, energy_col ='new Scaled Energies use',
@@ -1197,7 +1281,8 @@ class eels_rf_setup():
         # store prediction information
         self.mixed_valent_pred.append([self.prediction, self.prediction_std, self.true_val])
 
-    def simulated_mixed_valent(self, catagory = '0-1', colorbar_range = [0.1, 0.5], savefigure=False):
+    def simulated_mixed_valent(self, catagory = '0-1', colorbar_range = [0.1, 0.5], savefigure=False,
+                               prediction_type = 'Mean'):
         """
         Generates and predicts binary simulated mixture spectra in a range of 50 mixtures from purely the lower
         oxidation state to purely the higher oxidation state. Plots the results by generating a predicted vs true plot
@@ -1390,10 +1475,14 @@ class eels_rf_setup():
 
 
 
-    def experimental_mixed_valent(self, catagory = '0-1', smoothing_params = [51,3], show_plots = False,
-                                  show_predicted_spectrum = False, colorbar_range = [0.1, 0.5], savefigure=False,
+    def experimental_mixed_valent(self, catagory = '0-1', smoothing_params = (51,3), show_plots = False,
+                                  show_predicted_spectrum = False, colorbar_range = (0.1, 0.5), savefigure=False,
                                   exp_broadening = None, print_predictions = False, prediction_type='Mean',
-                                  show_hists = True, true_vals = []):
+                                  show_hists = True, true_vals = (), first_comp = (), second_comp = (),
+                                  num_mixed_vals = 20,
+                                  folder_path = 'C:/Users/smgls/Materials_database/Cu_deconvolved_spectra',
+                                  folder_path_type = 'TEAM I',
+                                  spectrum_shift = 0.0):
         """
         This function is very similar to 'simulated_mixed_valent' except its using experimetnal spectra instead
 
@@ -1408,10 +1497,14 @@ class eels_rf_setup():
         :param savefigure: whether to save the plot as a pdf (bool)
         :return:
         """
+        np.random.seed(32)
+
         min_std = colorbar_range[0]
         max_std = colorbar_range[1]
-        first_comp = list(np.linspace(1,0,51))
-        second_comp = list(np.linspace(0,1,51))
+        if len(first_comp) == 0:
+            first_comp = list(np.linspace(1,0,51))
+        if len(second_comp) == 0:
+            second_comp = list(np.linspace(0,1,51))
         self.reset_mixed_valent_series()
 
         if catagory == '0-1':
@@ -1425,7 +1518,10 @@ class eels_rf_setup():
                                                           exp_broadening=exp_broadening,
                                                           print_predictions=print_predictions,
                                                           show_hists = show_hists, true_val_from_label=true_vals,
-                                                          prediction_type='Regression')
+                                                          prediction_type='Regression',
+                                                          folder_path = folder_path,
+                                                          folder_path_type = folder_path_type,
+                                                          spectrum_shift = spectrum_shift)
             if prediction_type == 'Median':
                 first_pred = self.mixed_valent_pred[0][1]
             if prediction_type == 'Mean':
@@ -1437,19 +1533,19 @@ class eels_rf_setup():
             if prediction_type == 'Mean':
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred)-1][0]
 
-            trues = []
             # generate true values based on the values returned for the integer spectra from our RF model, rather
             # than just assigning 0, 1 and 2. This is because we can't  expect the model to do better on mixture
             # spectra than it does on integers and, as described in the manuscript, we believe the prediction of 0.3
             # for the Cu metal spectrum is more accurate than its nominal label of zero.
-            for i in range(0, len(first_comp)):
-                trues.append(first_comp[i] * first_pred + second_comp[i] * last_pred)
+            # for i in range(0, len(first_comp)):
+            #     trues.append(first_comp[i] * first_pred + second_comp[i] * last_pred)
+            trues = np.asarray(self.mixed_valent_pred).T[3]
             # print(trues)
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
             plt.figure(figsize=(8, 7))
             plt.title('Experimental Cu(0) to Cu(I)', fontsize=26)
-            plt.xticks([0.3,0.5,0.7,0.9,1.1])
-            plt.yticks([0.3,0.5,0.7,0.9,1.1])
+            # plt.xticks([0.3,0.5,0.7,0.9,1.1])
+            # plt.yticks([0.3,0.5,0.7,0.9,1.1])
         elif catagory == '1-2':
             # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
@@ -1460,7 +1556,10 @@ class eels_rf_setup():
                                                                  smoothing_params=smoothing_params,
                                                           exp_broadening=exp_broadening,
                                                           show_hists = show_hists, true_val_from_label=true_vals,
-                                                          prediction_type='Regression')
+                                                          prediction_type='Regression',
+                                                          folder_path_type = folder_path_type,
+                                                          folder_path = folder_path,
+                                                          spectrum_shift=spectrum_shift)
             if prediction_type == 'Median':
                 first_pred = self.mixed_valent_pred[0][1]
             if prediction_type == 'Mean':
@@ -1470,25 +1569,32 @@ class eels_rf_setup():
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][1]
             if prediction_type == 'Mean':
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][0]
-            trues = []
-            for i in range(0, len(first_comp)):
-                trues.append(first_comp[i] * first_pred + second_comp[i] * last_pred)
+            trues = np.asarray(self.mixed_valent_pred).T[3]
+
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
             plt.figure(figsize=(8, 7))
             plt.title('Experimental Cu(I) to Cu(II)', fontsize=26)
 
 
         elif catagory == '0-2':
-            for i in range(0, len(first_comp)):
+
+            comps = np.random.rand(num_mixed_vals, 3)
+
+            for i in tqdm(range(0, len(comps))):
+            # for i in range(0, len(comps)):
                 # print(first_comp[i] + second_comp[i])
-                self.predict_Experimental_Cu_non_integers(cu_metal=first_comp[i], cu2o=0, cuo=second_comp[i],
+                # print(comps[i])
+                self.predict_Experimental_Cu_non_integers(cu_metal=comps[i][0], cu2o=comps[i][1], cuo=comps[i][2],
                                                                  show_plots=show_plots,
                                                           show_predicted_spectrum=show_predicted_spectrum,
                                                                  smoothing_params=smoothing_params,
                                                           exp_broadening=exp_broadening,
-                                                          print_predictions=print_predictions,
-                                                          show_hists = show_hists,
-                                                          prediction_type='Regression')
+                                                          show_hists = show_hists, true_val_from_label=true_vals,
+                                                          prediction_type='Regression',
+                                                          folder_path_type=folder_path_type,
+                                                          folder_path=folder_path,
+                                                          spectrum_shift=spectrum_shift)
+
             if prediction_type == 'Median':
                 first_pred = self.mixed_valent_pred[0][1]
             if prediction_type == 'Mean':
@@ -1498,15 +1604,16 @@ class eels_rf_setup():
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][1]
             if prediction_type == 'Mean':
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][0]
-            trues = []
-            for i in range(0, len(first_comp)):
-                trues.append(first_comp[i] * first_pred + second_comp[i] * last_pred)
+            trues = np.asarray(self.mixed_valent_pred).T[3]
+
             plt.figure(figsize=(8, 7))
-            plt.title('Experimental Mixtures Cu(0) to Cu(II)', fontsize=22, fontweight = 'bold')
+            plt.title('Experimental Mixtures Cu(0) to Cu(II)', fontsize=16)
 
         predictions_mean = np.asarray(self.mixed_valent_pred).T[0]
         predictions_median = np.asarray(self.mixed_valent_pred).T[1]
         prediction_std = np.asarray(self.mixed_valent_pred).T[2]
+
+        self.mixed_valent_summary = [predictions_mean, predictions_median, prediction_std, trues]
 
 
         # print(len(count))
@@ -1519,23 +1626,59 @@ class eels_rf_setup():
                              vmax=max_std)
         cb = plt.colorbar(sc, label='Prediction Std')
         # print(len(count))
-        plt.plot(trues, trues, color='k', linestyle='--', linewidth=3)
+        if catagory == '0-2':
+            plt.plot(np.linspace(0,2,21), np.linspace(0,2,21), color='k', linestyle='--', linewidth=3)
+        else:
+            bot = round(min(min(trues), min(predictions_mean))-0.1, 1)
+            top = round(max(max(trues), max(predictions_mean))+0.1, 1)
+
+            plt.plot(np.linspace(bot, top, 5),
+                     np.linspace(bot, top, 5),
+                     color='k', linestyle='--', linewidth=3)
+
         ax = cb.ax
         text = ax.yaxis.label
         font = matplotlib.font_manager.FontProperties(size=28)
         text.set_font_properties(font)
         for t in cb.ax.get_yticklabels():
-            t.set_fontsize(28)
+            t.set_fontsize(14)
             # t.set_weight('bold')
-        plt.xticks(fontsize=28)
-        plt.yticks(fontsize=28)
+
+        if catagory == '0-1':
+            plt.xticks([0,0.25,0.5,0.75,1], fontsize=18)
+            plt.yticks([0,0.25,0.5,0.75,1], fontsize=18)
+
+
+        if catagory == '1-2':
+            # plt.xticks([1,1.25,1.5,1.75,2], fontsize=18)
+            # plt.yticks([1,1.25,1.5,1.75,2], fontsize=18)
+
+            plt.xticks([0,0.5,1,1.5,2], fontsize=18)
+
+        if catagory == '0-2':
+            plt.xticks([0,0.5,1,1.5,2], fontsize=18)
+        else:
+            plt.xticks(fontsize = 18)
+        if prediction_type == 'Mean':
+            plt.xlim([round(min(min(trues), min(predictions_mean))-0.1, 1), round(max(max(trues), max(predictions_mean))+0.1, 1)])
+            plt.ylim([round(min(min(trues), min(predictions_mean))-0.1, 1), round(max(max(trues), max(predictions_mean))+0.1, 1)])
+            plt.xlim([-0.1, 2.1])
+            plt.ylim([-0.1, 2.1])
+
+        if prediction_type == 'Median':
+            plt.xlim([round(min(trues, predictions_median)-0.1, 1), round(max(trues, predictions_median)+0.1, 1)])
+            plt.ylim([round(min(trues, predictions_median)-0.1, 1), round(max(trues, predictions_median)+0.1, 1)])
+
+        plt.yticks(fontsize=18)
         plt.xlabel('True Value', fontsize=28)
         plt.ylabel('Bond Valance Prediction', fontsize=28)
         if savefigure:
+            plt.rcParams['pdf.fonttype'] = 'truetype'
             plt.savefig('Experimental Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
 
     def visualize_shift(self, material = 'All', show_stds = False, show_table = False, savefigure=False,
-                        show_shift_labels = False, shift_labels = (0.9, 1.2, 1.2), spectrum_type = 'XAS'):
+                        show_shift_labels = False, shift_labels = (0.9, 1.2, 1.2), spectrum_type = 'XAS',
+                        show_true_val = False, theory_index = ()):
         """
         Generates a scatter plot showing how shifting the energy axis changes the spectrum's predicted oxidation
         state. This function rests on having already run 'predict_experiment_folder' on a spectrum at a series of
@@ -1555,9 +1698,10 @@ class eels_rf_setup():
         if material == 'All':
             mins = []
             maxes = []
-            for mat in ['Cu Metal', 'Cu2O', 'CuO']:
-                # extract predictions from each standard
+            for mat in self.prediction_df['Material'].unique():
+            # extract predictions from each standard
                 subdf = self.prediction_df.loc[self.prediction_df['Material'] == mat]
+                # print(subdf)
                 if len(subdf) != 0:
                     prediction_std = np.asarray(subdf['Predictions Std'])
 
@@ -1570,7 +1714,7 @@ class eels_rf_setup():
             bv = 0
             label_count = 0
             label_fontsizes = [18, 18, 18]
-            for mat in ['Cu Metal', 'Cu2O', 'CuO']:
+            for mat in self.prediction_df['Material'].unique():
                 subdf = self.prediction_df.loc[self.prediction_df['Material'] == mat]
                 print(len(subdf))
                 if len(subdf) != 0:
@@ -1595,8 +1739,8 @@ class eels_rf_setup():
                     ax.get_xticks() # will get the current ticks
                     ax.xaxis.set_minor_locator(AutoMinorLocator())
 
-                    ax.tick_params(which='major', width=4, length = 10)
-                    ax.tick_params(which='minor', width=2, length = 5)
+                    ax.tick_params(which='major', width=2, length = 10)
+                    ax.tick_params(which='minor', width=1, length = 5)
 
                     ax.xaxis.set_minor_locator(MultipleLocator(0.1))
                     if spectrum_type == 'XAS':
@@ -1624,7 +1768,11 @@ class eels_rf_setup():
                     #     plt.tick_params(labelleft=False)
 
                     if show_shift_labels:
-                        plt.vlines(0.0, -0.05, 2.3, linestyles='--', linewidth = 3, color = 'k',
+                        if show_true_val:
+                            true_bv = self.spectra_df.iloc[theory_index[label_count]]['BV Used For Alignment']
+                            plt.hlines(y = true_bv, xmin=shifts[0], xmax=shifts[-1], label='True Bond Valence',
+                                       color = 'darkorange', linewidth = 3, linestyle = '--')
+                        plt.vlines(0.0, -0.05, 2.3, linestyles='-', linewidth = 3, color = 'k',
                                    label = 'Prediction Raw Spectrum')
                         plt.vlines(shift_labels[label_count], -0.05, 2.3, linestyles='--', linewidth = 3, color = 'r',
                                    label = 'Prediction Manual Alignment')
@@ -1633,6 +1781,7 @@ class eels_rf_setup():
 
 
                     if savefigure:
+                        plt.rcParams['pdf.fonttype'] = 'truetype'
                         plt.savefig(spectrum_type + ' Spectrum Shift Analysis ' + mat + '.pdf', bbox_inches='tight', transparent=True)
 
                     for i in range(0, len(shifts)):
@@ -1791,7 +1940,8 @@ class eels_rf_setup():
                                          use_dnn = False, dnn_model = None, show_plots = False, show_hist = False,
                                          show_inputted_spectrum = True, save_all_figures = False, savefigure = False,
                                          baseline_subtract_csv=True,
-                                         prediction_type = 'Mean'):
+                                         prediction_type = 'Mean',
+                                         check_alignment = False):
 
         """
         This function takes in an experimental EELS/XAS spectrum and predicts its oxidation state using our random
@@ -1887,7 +2037,31 @@ class eels_rf_setup():
             # TODO This will need to be updated before broad use with csv data is possible
             intens_temp = output['Intensity'] - min(output['Intensity'])
             intens = intens_temp / intens_temp[len(intens_temp) - 5]
-            energies = output['Energy (eV)']
+            intens = list(intens)
+            energies = list(output['Energy (eV)'])
+
+            # plt.plot(energies, intens)
+
+            if min(energies) > 920.0:
+                if min(energies) < 930.0:
+                    first_inten = intens[0]
+                    to_add = list(np.arange(920, min(energies), 0.1))
+                    to_add.reverse()
+                    for a in to_add:
+                        energies.insert(0, round(a,1))
+                        intens.insert(0, first_inten)
+
+            if max(energies) < 975.0:
+                if max(energies) > 960.0:
+                    last_inten = intens[-1]
+                    to_add = list(np.arange(max(energies), 975.1, 0.1))
+                    for a in to_add:
+                        energies.append(round(a,1))
+                        intens.append(last_inten)
+
+            # plt.plot(energies, intens, color = 'k', linestyle = ':')
+            # plt.show()
+
             if show_plots:
                 plt.xticks([900, 920, 940, 960, 980], fontsize=36)
                 plt.yticks(fontsize=36)
@@ -2017,7 +2191,7 @@ class eels_rf_setup():
         self.intensities_final = f(self.final_energies)
         # if exp_spectrum_type == 'csv':
         #     self.intensities_final = self.intensities_final - min(self.intensities_final)
-        if show_plots:
+        if check_alignment:
             plt.figure(figsize=(8, 7))
             plt.xticks(fontsize=36)
             plt.yticks(fontsize=36)
@@ -2038,23 +2212,23 @@ class eels_rf_setup():
             # plt.plot(self.spectra_df.iloc[theory_index][self.energy_col],
             #          self.spectra_df.iloc[theory_index][theory_column][0:451],
             #          label='From FEFF', linewidth=4)
-            plt.figure(figsize=(8, 7))
-            #plt.xticks([930, 950, 970], fontsize=36)
-            plt.xlim([925,945])
-            plt.yticks(fontsize=36)
-            plt.ylabel('Intensity', fontsize=36)
-            plt.xlabel('Energy (eV)', fontsize=36)
-            if material == 'Cu2O':
-                material = 'Cu$_2$O'
-            plt.title('EELS Spectrum ' + material, fontsize=30)
-            if material == 'Cu$_2$O':
-                material = 'Cu2O'
+            # plt.figure(figsize=(8, 7))
+            # plt.xticks([930, 950, 970], fontsize=36)
+            # plt.xlim([925,945])
+            # plt.yticks(fontsize=36)
+            # plt.ylabel('Intensity', fontsize=36)
+            # plt.xlabel('Energy (eV)', fontsize=36)
+            # if material == 'Cu2O':
+            #     material = 'Cu$_2$O'
+            # plt.title('EELS Spectrum ' + material, fontsize=30)
+            # if material == 'Cu$_2$O':
+            #     material = 'Cu2O'
             # plt.plot(interp_energies_final,interped_intens_smoothed, label = 'Experiment Smoothed', linewidth = 3)
-            plt.plot(self.final_energies, self.intensities_final,
-                     label='Experimental Spectrum', linewidth=4, zorder=10)
-            if savefigure:
-                plt.savefig(material + ' Exp Spectrum.pdf', bbox_inches='tight', transparent=True)
-            plt.show()
+            # plt.plot(self.final_energies, self.intensities_final,
+            #          label='Experimental Spectrum', linewidth=4, zorder=10)
+            # if savefigure:
+            #     plt.savefig(material + ' Exp Spectrum.pdf', bbox_inches='tight', transparent=True)
+            # plt.show()
 
         # another somewhat meaningless rescaling, since it will all be undone by the cumulative spectrum operation
         self.intensities_final = self.intensities_final / np.mean(self.intensities_final[len(self.intensities_final) - points_to_average:len(self.intensities_final)])
@@ -2088,6 +2262,7 @@ class eels_rf_setup():
             if savefigure:
                 plt.savefig(material + ' Outline Cumulative Spectrum.pdf', bbox_inches='tight', transparent=True)
 
+        # print(min(self.intensities_final))
 
         # plt.hlines(1, energies_range[0], energies_range[1], color = 'k')
         # plt.plot(self.spectra_df.iloc[theory_index][self.energy_col],
@@ -2124,17 +2299,18 @@ class eels_rf_setup():
         # predict spectrum using the random forest model and extract predictions from each decision tree
         else:
             pred = self.rf_model.predict([np.asarray(self.intensities_final)])
-            predictions_full = []
+            predictions_full_temp = []
             trees = rf_model.estimators_
             for tree in trees:
-                predictions_full.append(tree.predict([np.asarray(self.intensities_final)]))
+                predictions_full_temp.append(tree.predict([np.asarray(self.intensities_final)]))
 
 
 
 
         # store predictions
         if model_type == 'regression':
-            predictions_full = np.asarray(predictions_full).T[0]
+            predictions_full = np.asarray(predictions_full_temp).T[0]
+            predictions_full_temp = np.asarray(predictions_full_temp).T
             pred_median = np.median(predictions_full)
             predictions_std = np.std(predictions_full)
 
@@ -2147,8 +2323,19 @@ class eels_rf_setup():
             if prediction_type == 'Median':
                 self.prediction = round(pred_median, 2)
             if prediction_type == 'Mean':
-                self.prediction = round(pred[0], 2)
-            self.prediction_std = round(predictions_std, 2)
+                try:
+                    self.prediction = round(pred[0], 2)
+                    self.prediction_std = round(predictions_std, 2)
+                except:
+                    self.prediction = pred[0]
+                    print(pred[0])
+                    plt.hist(predictions_full_temp[0][0])
+                    plt.show()
+                    plt.hist(predictions_full_temp[1][0])
+                    plt.show()
+                    plt.hist(predictions_full_temp[2][0])
+                    plt.show()
+
             self.true_val = self.spectra_df.iloc[theory_index]['BV Used For Alignment']
 
         if model_type == 'categorical':
@@ -2289,6 +2476,7 @@ class eels_rf_setup():
         MSE_list = np.square(errors)
         MSE = np.mean(MSE_list)
         RMSE = math.sqrt(MSE)
+        self.rmse = RMSE
 
         print('RMSE ' + str(RMSE))
         plt.figure(figsize=(8, 6))
@@ -2466,7 +2654,7 @@ class eels_rf_setup():
             else:
                 count.append(error_df[[pred_col, 'Labels Test Rounded']].value_counts()[i])
         print('model accuracy (R^2) on simulated test data using ' + prediction_type + ' trees ' +
-              str(r2_score(np.asarray(error_df['Labels Test Rounded']), np.asarray(error_df[pred_col]))))
+              str(r2_score(np.asarray(error_df['Labels Test']), np.asarray(error_df['Predictions']))))
         print(len(count))
         print(len(pred))
         count = np.asarray(count)
@@ -2758,6 +2946,7 @@ class eels_rf_setup():
         :return: Updates dataframe with mixtures
         """
         # 100 evenly spaced components from 0 to 1 which will be random sampled to build out the mixture spectra
+        np.random.seed(32)
         cu_metal = list(np.linspace(1, 0, 101))
         cu_1 = list(np.linspace(0, 1, 101))
         cu_2 = list(np.linspace(0, 1, 101))
@@ -3040,7 +3229,7 @@ class eels_rf_setup():
                                              spectra_to_predict='925-970 Onset Energy Removed Broadened 0.3 eV',
                                              test_fraction=0.25,  show_uncertianty=True,num_trees=500,
                                              energy_col='new Scaled Energies use', max_features='auto',
-                                         split_by_id_mixed_valent = True):
+                                         split_by_id_mixed_valent = True, use_full_training_data = False):
         """
         This function trains the random forest model based on the pandas dataframe provided when the object was
         initialized. It then generates attributes corresponding to the model itself, a dataframe describing the
@@ -3059,6 +3248,7 @@ class eels_rf_setup():
         :return: None, output saved as attributes
         """
         # label spectra and energy value
+        np.random.seed(32)
         self.energy_col = energy_col
         self.predicted_col = spectra_to_predict
         error_df = None
@@ -3067,209 +3257,269 @@ class eels_rf_setup():
             print('no spectra df, loading ' + self.spectra_df_filepath)
             self.load_spectra_df()
 
-        # drop the stable forms of Cu metal, Cu2O and CuO to ensure validation experimental spectra aren't baised
-        # by having these in the training set
-        cu_metal_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-30'].index[0:5]
-        cu2o_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-361'].index[0:5]
-        cuo_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-704645'].index[0:5]
+        if use_full_training_data == False:
+            # drop the stable forms of Cu metal, Cu2O and CuO to ensure validation experimental spectra aren't baised
+            # by having these in the training set
+            cu_metal_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-30'].index[0:5]
+            cu2o_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-361'].index[0:5]
+            cuo_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-704645'].index[0:5]
 
-        full_drop_indicies = []
-        for i in cu_metal_index:
-            full_drop_indicies.append(i)
-        for k in cu2o_index:
-            full_drop_indicies.append(k)
-        for j in cuo_index:
-            full_drop_indicies.append(j)
-
-
-        self.spectra_df_no_oxides = self.spectra_df.drop(full_drop_indicies)
-        # self.spectra_df_no_oxides = self.spectra_df
-        self.spectra_df_no_oxides = self.spectra_df_no_oxides.reset_index()
-        # if 'Broadened' not in spectra_to_predict:
-        if split_by_id_mixed_valent == False:
-            # extract oxidation states and spectra from dataframe
-            bond_valences = self.spectra_df_no_oxides[bv_column]
-            scaled_spectra = np.asarray(self.spectra_df_no_oxides[spectra_to_predict])
-
-            # split into training and test sets
-            spectra_train, spectra_test, labels_train, labels_test = train_test_split(scaled_spectra, bond_valences,
-                                                                                      test_size=test_fraction,
-                                                                                      random_state=32)
-
-        if split_by_id_mixed_valent == True:
-
-            non_mix_df = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides['mp_id'].notnull()]
-            mix_df = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides['mp_id'].isnull()]
-
-            indicies_train_mix, indicies_test_mix = train_test_split(mix_df.full_mp_id_string.unique(),
-                                                             test_size=0.25,
-                                                             random_state=32)
-
-            indicies_train_ind, indicies_test_ind = train_test_split(non_mix_df.full_mp_id_string.unique(),
-                                                             test_size=0.25,
-                                                             random_state=32)
-
-            indicies_train = []
-            for i in indicies_train_ind:
-                indicies_train.append(i)
-            for i in indicies_train_mix:
-                indicies_train.append(i)
-
-            indicies_test = []
-            for i in indicies_test_ind:
-                indicies_test.append(i)
-            for i in indicies_test_mix:
-                indicies_test.append(i)
-
-            labels_train = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_train)][
-                bv_column]
-            labels_test = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_test)][bv_column]
-
-            spectra_train = np.asarray(
-                self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_train)][spectra_to_predict])
-            spectra_test = np.asarray(
-                self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_test)][spectra_to_predict])
-
-        # else:
-        #     print('splitting by mat ID')
-            # extract oxidation states and spectra from dataframe
-        #     indicies_train, indicies_test = train_test_split(self.spectra_df.Index.unique(),
-        #                      test_size=0.25,
-        #                      random_state=32)
-
-        #     labels_train = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_train)][bv_column]
-        #     labels_test = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_test)][bv_column]
-
-        #     spectra_train = np.asarray(self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_train)][spectra_to_predict])
-        #     spectra_test = np.asarray(self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_test)][spectra_to_predict])
+            full_drop_indicies = []
+            for i in cu_metal_index:
+                full_drop_indicies.append(i)
+            for k in cu2o_index:
+                full_drop_indicies.append(k)
+            for j in cuo_index:
+                full_drop_indicies.append(j)
 
 
+            self.spectra_df_no_oxides = self.spectra_df.drop(full_drop_indicies)
+            # self.spectra_df_no_oxides = self.spectra_df
+            self.spectra_df_no_oxides = self.spectra_df_no_oxides.reset_index()
+            # if 'Broadened' not in spectra_to_predict:
+            if split_by_id_mixed_valent == False:
+                # extract oxidation states and spectra from dataframe
+                bond_valences = self.spectra_df_no_oxides[bv_column]
+                scaled_spectra = np.asarray(self.spectra_df_no_oxides[spectra_to_predict])
 
-        # process spectra so they're all arrays
-        updated_spectra_train = []
-        for i in spectra_train:
-            updated_spectra_train.append(np.asarray(i))
+                # split into training and test sets
+                spectra_train, spectra_test, labels_train, labels_test = train_test_split(scaled_spectra, bond_valences,
+                                                                                          test_size=test_fraction,
+                                                                                          random_state=32)
 
-        updated_spectra_test = []
-        for i in spectra_test:
-            updated_spectra_test.append(np.asarray(i))
+            if split_by_id_mixed_valent == True:
 
-        self.labels_train = labels_train
-        self.labels_test = labels_test
+                non_mix_df = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides['mp_id'].notnull()]
+                mix_df = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides['mp_id'].isnull()]
 
-        self.spectra_train = updated_spectra_train
-        self.spectra_test = updated_spectra_test
+                indicies_train_mix, indicies_test_mix = train_test_split(mix_df.full_mp_id_string.unique(),
+                                                                 test_size=0.25,
+                                                                 random_state=32)
+
+                indicies_train_ind, indicies_test_ind = train_test_split(non_mix_df.full_mp_id_string.unique(),
+                                                                 test_size=0.25,
+                                                                 random_state=32)
+
+                indicies_train = []
+                for i in indicies_train_ind:
+                    indicies_train.append(i)
+                for i in indicies_train_mix:
+                    indicies_train.append(i)
+
+                indicies_test = []
+                for i in indicies_test_ind:
+                    indicies_test.append(i)
+                for i in indicies_test_mix:
+                    indicies_test.append(i)
+
+                labels_train = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_train)][
+                    bv_column]
+                labels_test = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_test)][bv_column]
+
+                spectra_train = np.asarray(
+                    self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_train)][spectra_to_predict])
+                spectra_test = np.asarray(
+                    self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.full_mp_id_string.isin(indicies_test)][spectra_to_predict])
+
+            # else:
+            #     print('splitting by mat ID')
+                # extract oxidation states and spectra from dataframe
+            #     indicies_train, indicies_test = train_test_split(self.spectra_df.Index.unique(),
+            #                      test_size=0.25,
+            #                      random_state=32)
+
+            #     labels_train = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_train)][bv_column]
+            #     labels_test = self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_test)][bv_column]
+
+            #     spectra_train = np.asarray(self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_train)][spectra_to_predict])
+            #     spectra_test = np.asarray(self.spectra_df_no_oxides.loc[self.spectra_df_no_oxides.Index.isin(indicies_test)][spectra_to_predict])
+
+
+
+            # process spectra so they're all arrays
+            updated_spectra_train = []
+            for i in spectra_train:
+                updated_spectra_train.append(np.asarray(i))
+
+            updated_spectra_test = []
+            for i in spectra_test:
+                updated_spectra_test.append(np.asarray(i))
+
+            self.labels_train = labels_train
+            self.labels_test = labels_test
+
+            self.spectra_train = updated_spectra_train
+            self.spectra_test = updated_spectra_test
+
+        if use_full_training_data:
+
+            bond_valences = self.spectra_df[bv_column]
+            scaled_spectra = np.asarray(self.spectra_df[spectra_to_predict])
+
+
+            updated_spectra_train = []
+            for i in scaled_spectra:
+                updated_spectra_train.append(np.asarray(i))
+            labels_train = np.asarray(bond_valences)
+            self.labels_train = labels_train
+            self.spectra_train = updated_spectra_train
 
 
         print('len training data = ' + str(len(self.labels_train)))
-        print('Using column: ' + spectra_to_predict + ' to predict: ' + bv_column)
+        try:
+            print('Using column: ' + spectra_to_predict + ' to predict: ' + bv_column)
+        except:
+            print('Using columns: ' + spectra_to_predict + ' to predict: ' +
+                  bv_column[0] + ' ' + bv_column[1] + ' ' + bv_column[2])
+
 
         # train model
         if kind == 'regression':
             rf_model = RandomForestRegressor(n_estimators=num_trees, n_jobs=-1, max_features=max_features,
                                          random_state=32)
+
         if kind == 'categorical':
             rf_model = RandomForestClassifier(n_estimators=num_trees, n_jobs=-1, max_features=max_features,
                                          random_state=32)
 
+        if kind == 'component_array':
+            rf_model = RandomForestRegressor(n_estimators=num_trees, n_jobs=-1, max_features=max_features,
+                                         random_state=32)
+
         rf_model.fit(self.spectra_train, self.labels_train)
-        accuracy = rf_model.score(np.asarray(updated_spectra_test), np.asarray(labels_test))
-        print('model accuracy (R^2) on simulated test data ' + str(accuracy))
-        self.accuracy = accuracy
 
-        # predict test set
-        predictions = rf_model.predict(updated_spectra_test)
 
-        if show_uncertianty:
-            # build prediction standard deviation by storing the predictions of each decision tree
-            predictions_full = []
-            trees = rf_model.estimators_
-            for tree in trees:
-                predictions_full.append(tree.predict(np.asarray(updated_spectra_test)))
-            predictions_ordered = np.asarray(predictions_full).T
-            predictions_std = []
-            predictions_diff_confidence = []
-            count = 0
-            for prediction in predictions_ordered:
-                if kind=='regression':
-                    predictions_std.append(np.std(prediction))
-                if kind=='categorical':
-                    pred_df_temp = pd.DataFrame(prediction, columns=['Full_predictions'])
-                    # print(pred_df_temp)
-                    # print(pred_df_temp.Full_predictions)
-                    # print(pred_df_temp.Full_predictions.value_counts())
-                    vals = np.asarray(pred_df_temp.Full_predictions.value_counts())
-                    predictions_std.append(vals[0]/num_trees)
-                    if len(vals) > 1:
-                        predictions_diff_confidence.append(vals[0]/num_trees-vals[1]/num_trees)
+
+
+        if use_full_training_data == False:
+            accuracy = rf_model.score(self.spectra_test, self.labels_test)
+            print('model accuracy (R^2) on simulated test data ' + str(accuracy))
+            self.accuracy = accuracy
+
+            # predict test set
+            predictions = rf_model.predict(updated_spectra_test)
+
+            if show_uncertianty:
+                # build prediction standard deviation by storing the predictions of each decision tree
+                predictions_full = []
+                trees = rf_model.estimators_
+                for tree in trees:
+                    predictions_full.append(tree.predict(np.asarray(updated_spectra_test)))
+                predictions_ordered = np.asarray(predictions_full).T
+                predictions_std = []
+                predictions_diff_confidence = []
+                count = 0
+                for prediction in predictions_ordered:
+                    if kind=='regression':
+                        predictions_std.append(np.std(prediction))
+                    if kind=='component_array':
+                        print(prediction[0].shape)
+                    if kind=='categorical':
+                        pred_df_temp = pd.DataFrame(prediction, columns=['Full_predictions'])
+                        # print(pred_df_temp)
+                        # print(pred_df_temp.Full_predictions)
+                        # print(pred_df_temp.Full_predictions.value_counts())
+                        vals = np.asarray(pred_df_temp.Full_predictions.value_counts())
+                        predictions_std.append(vals[0]/num_trees)
+                        if len(vals) > 1:
+                            predictions_diff_confidence.append(vals[0]/num_trees-vals[1]/num_trees)
+                        else:
+                            predictions_diff_confidence.append(vals[0]/num_trees)
+
+
+                    count += 1
+                    # print(predictions_std)
+
+                # compile absolute value of errors
+                if kind == 'regression':
+                    errors = np.abs(labels_test - predictions)
+                    errors = np.asarray(errors)
+                if kind == 'categorical':
+                    errors = np.zeros(len(labels_test))
+
+                error_list = []
+
+                # store other labels for test set
+                task_ids = np.asarray(self.spectra_df_no_oxides.iloc[labels_test.index]['mpid_string'])
+                # stable = np.asarray(self.spectra_df_no_oxides.iloc[labels_test.index]['is_stable'])
+                # theoretical = np.asarray(self.spectra_df_no_oxides.iloc[labels_test.index]['is_theoretical'])
+
+                # build test set df with predictions and other statistics
+                if kind == 'regression':
+                    if spectra_to_predict == 'Cumulative_Spectra_TEAM_1_aligned_920_970':
+                        raw_spec_col = 'TEAM_1_aligned_920_970'
                     else:
-                        predictions_diff_confidence.append(vals[0]/num_trees)
+                        raw_spec_col = 'TEAM_1_aligned_925_970'
+                    for i in range(0, len(labels_test)):
+                        error_list.append(
+                            [np.asarray(labels_test)[i], round(np.asarray(labels_test)[i], 1), predictions[i],
+                             round(predictions[i], 1), errors[i], round(errors[i], 1),
+                             predictions_std[i], predictions_ordered[i], task_ids[i],
+                             self.spectra_df_no_oxides['pretty_formula'].iloc[labels_test.index[i]],
+                             np.asarray(self.spectra_df_no_oxides[energy_col].iloc[0]),
+                             updated_spectra_test[i],
+                             self.spectra_df_no_oxides[raw_spec_col].iloc[labels_test.index[i]],
+                             self.spectra_df_no_oxides['BV Used For Alignment'].iloc[labels_test.index[i]],
+                             labels_test.index[i]])
+                    columns = [
+                        'Labels Test', 'Labels Test Rounded', 'Predictions', 'Predictions Rounded', 'Errors',
+                        'Errors Rounded',
+                        'Predictions Std', 'Full Predictions', 'Materials Ids', 'Pretty Formula',
+                        'Energies', 'Spectrum', 'XAS Spectrum', 'raw valence', 'spec_df_no_oxides_index']
+
+                if kind == 'categorical':
+                    for i in range(0, len(labels_test)):
+                        error_list.append(
+                            [np.asarray(labels_test)[i], predictions[i],
+                             predictions_std[i], predictions_diff_confidence[i],
+                             predictions_ordered[i], task_ids[i],
+                             self.spectra_df_no_oxides['pretty_formula'].iloc[labels_test.index[i]],
+                             np.asarray(self.spectra_df_no_oxides[energy_col].iloc[0]),
+                             updated_spectra_test[i],
+                             self.spectra_df_no_oxides[raw_spec_col].iloc[labels_test.index[i]],
+                             self.spectra_df_no_oxides['BV Used For Alignment'].iloc[labels_test.index[i]],
+                             labels_test.index[i]])
+                    columns = [
+                        'Labels Test',  'Predictions',
+                        'Prediction Confidence', 'Prediction Difference Confidence',
+                        'Full Predictions', 'Materials Ids', 'Pretty Formula',
+                        'Energies', 'Spectrum', 'XAS Spectrum', 'raw valence', 'spec_df_no_oxides_index']
 
 
-                count += 1
-                # print(predictions_std)
-
-            # compile absolute value of errors
-            if kind == 'regression':
-                errors = np.abs(labels_test - predictions)
-                errors = np.asarray(errors)
-            if kind == 'categorical':
-                errors = np.zeros(len(labels_test))
-
-            error_list = []
-
-            # store other labels for test set
-            task_ids = np.asarray(self.spectra_df_no_oxides.iloc[labels_test.index]['mpid_string'])
-            # stable = np.asarray(self.spectra_df_no_oxides.iloc[labels_test.index]['is_stable'])
-            # theoretical = np.asarray(self.spectra_df_no_oxides.iloc[labels_test.index]['is_theoretical'])
-
-            # build test set df with predictions and other statistics
-            if kind == 'regression':
-                if spectra_to_predict == 'Cumulative_Spectra_TEAM_1_aligned_920_970':
-                    raw_spec_col = 'TEAM_1_aligned_920_970'
-                else:
+                if kind == 'component_array':
                     raw_spec_col = 'TEAM_1_aligned_925_970'
-                for i in range(0, len(labels_test)):
-                    error_list.append(
-                        [np.asarray(labels_test)[i], round(np.asarray(labels_test)[i], 1), predictions[i],
-                         round(predictions[i], 1), errors[i], round(errors[i], 1),
-                         predictions_std[i], predictions_ordered[i], task_ids[i],
-                         self.spectra_df_no_oxides['pretty_formula'].iloc[labels_test.index[i]],
-                         np.asarray(self.spectra_df_no_oxides[energy_col].iloc[0]),
-                         updated_spectra_test[i],
-                         self.spectra_df_no_oxides[raw_spec_col].iloc[labels_test.index[i]],
-                         self.spectra_df_no_oxides['BV Used For Alignment'].iloc[labels_test.index[i]],
-                         labels_test.index[i]])
-                columns = [
-                    'Labels Test', 'Labels Test Rounded', 'Predictions', 'Predictions Rounded', 'Errors',
-                    'Errors Rounded',
-                    'Predictions Std', 'Full Predictions', 'Materials Ids', 'Pretty Formula',
-                    'Energies', 'Spectrum', 'XAS Spectrum', 'raw valence', 'spec_df_no_oxides_index']
+                    for i in range(0, len(labels_test)):
+                        error_list.append(
+                            [np.asarray(labels_test)[i][0], np.asarray(labels_test)[i][1], np.asarray(labels_test)[i][2],
+                             predictions[i][0], predictions[i][1], predictions[i][2],
+                             predictions_ordered[0][i], predictions_ordered[1][i], predictions_ordered[2][i],
+                             np.median(predictions_ordered[0][i]), np.median(predictions_ordered[1][i]),
+                             np.median(predictions_ordered[2][i]),
+                             task_ids[i],
+                             self.spectra_df_no_oxides['pretty_formula'].iloc[labels_test.index[i]],
+                             np.asarray(self.spectra_df_no_oxides[energy_col].iloc[0]),
+                             updated_spectra_test[i],
+                             self.spectra_df_no_oxides[raw_spec_col].iloc[labels_test.index[i]],
+                             self.spectra_df_no_oxides['BV Used For Alignment'].iloc[labels_test.index[i]],
+                             labels_test.index[i]])
+                    columns = [
+                        'True_Zero_Fraction', 'True_One_Fraction', 'True_Two_Fraction',
+                        'Pred_Zero_Fraction', 'Pred_One_Fraction', 'Pred_Two_Fraction',
+                        'Full_Pred_Zero_Fraction', 'Full_Pred_One_Fraction', 'Full_Pred_Two_Fraction',
+                        'Median_Pred_Zero_Fraction', 'Median_Pred_One_Fraction', 'Median_Pred_Two_Fraction',
+                        'Materials Ids', 'Pretty Formula',
+                        'Energies', 'Spectrum', 'XAS Spectrum', 'raw_valence', 'spec_df_no_oxides_index']
 
-            if kind == 'categorical':
-                for i in range(0, len(labels_test)):
-                    error_list.append(
-                        [np.asarray(labels_test)[i], predictions[i],
-                         predictions_std[i], predictions_diff_confidence[i],
-                         predictions_ordered[i], task_ids[i],
-                         self.spectra_df_no_oxides['pretty_formula'].iloc[labels_test.index[i]],
-                         np.asarray(self.spectra_df_no_oxides[energy_col].iloc[0]),
-                         updated_spectra_test[i],
-                         self.spectra_df_no_oxides[raw_spec_col].iloc[labels_test.index[i]],
-                         self.spectra_df_no_oxides['BV Used For Alignment'].iloc[labels_test.index[i]],
-                         labels_test.index[i]])
-                columns = [
-                    'Labels Test',  'Predictions',
-                    'Prediction Confidence', 'Prediction Difference Confidence',
-                    'Full Predictions', 'Materials Ids', 'Pretty Formula',
-                    'Energies', 'Spectrum', 'XAS Spectrum', 'raw valence', 'spec_df_no_oxides_index']
-            error_df = pd.DataFrame(np.asarray(error_list, dtype=object), columns=columns)
+
+                error_df = pd.DataFrame(np.asarray(error_list, dtype=object), columns=columns)
 
         # label attributes
-        self.rf_error_df = error_df
         self.rf_model = rf_model
-        self.rf_training_set = [updated_spectra_train, labels_train]
-        self.rf_test_set = [updated_spectra_test, labels_test]
+        self.rf_training_set = [self.spectra_train, self.labels_train]
+
+        if use_full_training_data == False:
+            self.rf_error_df = error_df
+            self.rf_test_set = [self.spectra_test, self.labels_test]
 
 
 
@@ -3514,7 +3764,7 @@ def build_L2_3(l3, l2, show_plot=True, savefigure = False):
     return [L3_energies_rounded, L2_3]
 
 
-def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, savefigure=False):
+def visualize_full_noise_test_set(noise_dfs, interp_ranges, top_line_accuracy, show_err = True, savefigure=False):
 
     """
     Visualization function for the data generated by a simulated noise analysis on the simulated test spectra
@@ -3557,18 +3807,18 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.xlim([-0.01, 0.225])
                 print('R2s')
                 print(mean_01, mean_05, mean_1, mean_2)
-                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
+                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[0], mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
 
                 if show_err:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2], color = 'k')
-                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[0], mean_01, mean_05, mean_1, mean_2], color = 'k')
+                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[0], mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
                                  ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
                     eb1[-1][0].set_linestyle(':')
                     if savefigure:
                         plt.savefig('R2 Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
 
                 else:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.9, mean_01, mean_05, mean_1, mean_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[0], mean_01, mean_05, mean_1, mean_2],
                              linewidth = 4, label = str(interp_ranges[count]))
 
             if vis == 'RMSE':
@@ -3581,26 +3831,28 @@ def visualize_full_noise_test_set(noise_dfs, interp_ranges, show_err = True, sav
                 plt.xlim([-0.01, 0.225])
                 print('RMSEs')
                 print(mean_01, mean_05, mean_1, mean_2)
-                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
+                plt.scatter([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[1], mean_01, mean_05, mean_1, mean_2], color = 'k', s=200, zorder=5)
 
                 if show_err:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2], color = 'k')
-                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[1], mean_01, mean_05, mean_1, mean_2], color = 'k')
+                    eb1 = plt.errorbar([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[1], mean_01, mean_05, mean_1, mean_2], yerr=[0, std_01, std_05, std_1, std_2],
                                  ecolor='k', errorevery=1, capsize=15, linewidth = 4, label = str(interp_ranges[count]))
                     eb1[-1][0].set_linestyle(':')
                     if savefigure:
                         plt.savefig('RMSE Noise Profile '+str(interp_ranges[count])+'.pdf',  bbox_inches='tight', transparent=True)
 
                 else:
-                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [0.2, mean_01, mean_05, mean_1, mean_2],
+                    plt.plot([0, 0.01, 0.05, 0.1, 0.2], [top_line_accuracy[1], mean_01, mean_05, mean_1, mean_2],
                              linewidth = 4, label = str(interp_ranges[count]))
         if show_err == False:
             plt.legend(fontsize = 22, title="Sampling Interval (eV)", title_fontsize = 22)
             if vis == 'RMSE':
                 if savefigure:
+                    plt.rcParams['pdf.fonttype'] = 'truetype'
                     plt.savefig('RMSE Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
             if vis == 'R2':
                 if savefigure:
+                    plt.rcParams['pdf.fonttype'] = 'truetype'
                     plt.savefig('R2 Noise Profile'+str(' all')+'.pdf',  bbox_inches='tight', transparent=True)
 
 
