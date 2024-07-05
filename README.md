@@ -3,7 +3,7 @@
 
 The code in this repo accompanies "Supervised Machine Learning Prediction of the Cu Oxidation State from EELS Spectra."
 
-The "Paper_Figures.ipynb" notebook reproduces all the plots that comprise the 6 main text figures and 10 SI figures in the paper. Headers designate which figures are being produced by the code in that region.
+The "Paper_Figures.ipynb" notebook reproduces all the plots that comprise the 6 main text figures and 16 SI figures in the paper. Headers designate which figures are being produced by the code in that region.
 
 "Analysis_objects_and_functions.py" contains an object, called eels_rf_setup, which runs most of the code discussed in this work. A few additional visualization functions are included at the end.
 
