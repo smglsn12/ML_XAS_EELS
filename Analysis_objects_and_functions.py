@@ -746,7 +746,7 @@ class eels_rf_setup():
 
                         else:
                             p = Path(path)
-                            name = p.parts[0]
+                            name = p.parts[1]
                             self.predict_experiment_random_forest(path, theory_indicies[0], name,
                                                                   model_type=model_type,
                                                                   exp_spectrum_type=spectra_type,
