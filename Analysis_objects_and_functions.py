@@ -205,7 +205,7 @@ class eels_rf_setup():
     def compare_simulation_to_experiment(self, material='CuO', savgol_params=[51, 3],
                                          xlims=[920, 980], show_feff=False, feff_shift=-10,
                                          compare_to_lit=False, lit_spectrum=None, lit_shift=0.0, title=None,
-                                         show_experiment = True, savefigure=False, theory_spec_col = 'TEAM_1_aligned_920_970'):
+                                         show_experiment = True, savefigure=False, theory_spec_col = 'TEAM_1_aligned_925_970'):
         """
         Creates a plot comparing any combination of simulated XAS, experimental EELS and literature XAS spectra
 
@@ -815,6 +815,7 @@ class eels_rf_setup():
                                 energies_range = [925, 970],
                                 exp_scale = 0.1,
                                 exp_broadening = None,
+                                savefig = False,
                                 show_hists = True,
                                              true_val_from_label = None,
                                              prediction_type = 'Categorical',
@@ -1058,6 +1059,12 @@ class eels_rf_setup():
             if prediction_type == 'Regression':
                 print('Prediction Median = ' + str(round(median_pred, 2)))
             print('prediction std = ' + str(round(predictions_std, 2)))
+        hist = np.histogram(predictions_full,
+                        bins=np.linspace(0, 2.6, 14))
+        height = max(hist[0])
+        height_ind = list(hist[0]).index(height)
+        pred_mode = (hist[1][height_ind] + 0.1)
+        self.mode = pred_mode
 
         # print('mean')
         # print(pred[0])
@@ -1069,15 +1076,19 @@ class eels_rf_setup():
             if prediction_type == 'Regression':
 
                 plt.figure(figsize=(6,5))
-                hist = plt.hist(predictions_full, edgecolor='k', facecolor='grey', fill=True, linewidth=3)
+                hist = plt.hist(predictions_full, edgecolor='k', facecolor='grey', fill=True, linewidth=5,
+                                bins = np.linspace(0,2.6,14))
                 height = max(hist[0])
-
+                height_ind = list(hist[0]).index(height)
+                pred_mode = (hist[1][height_ind] + 0.1)
+                # self.mode = pred_mode
+                plt.bar(pred_mode, height, width=0.2, color = 'thistle', label='Mode Prediction')
                 # plt.vlines(np.median(predictions_full), 0, height,
                 # color = 'purple', label = 'Median Prediction', linewidth = 5)
                 plt.vlines(true_val, true_val,
-                           height, color='blue', label='Labeled BV', linewidth=5)
-                plt.vlines(pred[0], 0, height, color='red', label='Average Prediction', linewidth=5, linestyle=':')
-                plt.vlines(median_pred, 0, height, color='k', label='Median Prediction', linewidth=5, linestyle='--')
+                           height+75, color='blue', label='Labeled BV', linewidth=5)
+                plt.vlines(pred[0], 0, height+50, color='red', label='Average Prediction', linewidth=5, linestyle='-')
+                plt.vlines(median_pred, 0, height+25, color='orange', label='Median Prediction', linewidth=5, linestyle='--')
 
                 mean = pred
                 std = predictions_std
@@ -1092,10 +1103,16 @@ class eels_rf_setup():
 
                 plt.xticks(fontsize=18)
                 plt.yticks(fontsize=18)
+                plt.ylim([0,500])
                 plt.xlabel('Prediction', fontsize=20)
                 plt.ylabel('Count', fontsize=20)
                 # plt.legend(fontsize = 16, loc='center left', bbox_to_anchor=(1, 0.5))
                 # plt.plot(np.arange(0,max(errors),0.1), np.arange(0,max(errors),0.1), color = 'k', linewidth = 3, linestyle = '--')
+                if savefig:
+                    plt.rcParams['pdf.fonttype'] = 'truetype'
+                    plt.savefig(str(true_val) + ' Mixed Val Prediction Histogram.pdf', bbox_inches='tight',
+                                transparent=True)
+                plt.legend(fontsize = 14, bbox_to_anchor=(1.8, 0.7))
                 plt.show()
 
             if prediction_type == 'Categorical':
@@ -1158,7 +1175,7 @@ class eels_rf_setup():
                 self.true_val = true_val
 
                 self.mixed_valent_pred.append([self.prediction_mean, self.prediction_median,
-                                               self.prediction_std, self.true_val])
+                                               self.prediction_std, self.true_val, self.mode])
 
     def predict_Cu_non_integers(self, cu_metal=1, cu2o=0, cuo=0, cu_int_indicies = (),
                                 show_standards = False, show_plots = False, energy_col ='new Scaled Energies use',
@@ -1494,7 +1511,8 @@ class eels_rf_setup():
                                   num_mixed_vals = 20,
                                   folder_path = 'C:/Users/smgls/Materials_database/Cu_deconvolved_spectra',
                                   folder_path_type = 'TEAM I',
-                                  spectrum_shift = 0.0):
+                                  spectrum_shift = 0.0,
+                                  show_err = True):
         """
         This function is very similar to 'simulated_mixed_valent' except its using experimetnal spectra instead
 
@@ -1533,7 +1551,8 @@ class eels_rf_setup():
                                                           prediction_type='Regression',
                                                           folder_path = folder_path,
                                                           folder_path_type = folder_path_type,
-                                                          spectrum_shift = spectrum_shift)
+                                                          spectrum_shift = spectrum_shift,
+                                                          savefig=savefigure)
             if prediction_type == 'Median':
                 first_pred = self.mixed_valent_pred[0][1]
             if prediction_type == 'Mean':
@@ -1554,8 +1573,8 @@ class eels_rf_setup():
             trues = np.asarray(self.mixed_valent_pred).T[3]
             # print(trues)
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
-            plt.figure(figsize=(8, 7))
-            plt.title('Experimental Cu(0) to Cu(I)', fontsize=26)
+            plt.figure(figsize=(8, 6))
+            plt.title(prediction_type + ' Experimental Cu(0) to Cu(I)', fontsize=26)
             # plt.xticks([0.3,0.5,0.7,0.9,1.1])
             # plt.yticks([0.3,0.5,0.7,0.9,1.1])
         elif catagory == '1-2':
@@ -1571,21 +1590,27 @@ class eels_rf_setup():
                                                           prediction_type='Regression',
                                                           folder_path_type = folder_path_type,
                                                           folder_path = folder_path,
-                                                          spectrum_shift=spectrum_shift)
+                                                          spectrum_shift=spectrum_shift,
+                                                          savefig=savefigure)
             if prediction_type == 'Median':
                 first_pred = self.mixed_valent_pred[0][1]
             if prediction_type == 'Mean':
                 first_pred = self.mixed_valent_pred[0][0]
+            if prediction_type == 'Mode':
+                first_pred = self.mixed_valent_pred[0][4]
 
             if prediction_type == 'Median':
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][1]
             if prediction_type == 'Mean':
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][0]
+            if prediction_type == 'Mode':
+                last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][4]
+
             trues = np.asarray(self.mixed_valent_pred).T[3]
 
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
-            plt.figure(figsize=(8, 7))
-            plt.title('Experimental Cu(I) to Cu(II)', fontsize=26)
+            plt.figure(figsize=(8, 6))
+            plt.title(prediction_type + ' Experimental Cu(I) to Cu(II)', fontsize=26)
 
 
         elif catagory == '0-2':
@@ -1605,7 +1630,8 @@ class eels_rf_setup():
                                                           prediction_type='Regression',
                                                           folder_path_type=folder_path_type,
                                                           folder_path=folder_path,
-                                                          spectrum_shift=spectrum_shift)
+                                                          spectrum_shift=spectrum_shift,
+                                                          savefig=savefigure)
 
             if prediction_type == 'Median':
                 first_pred = self.mixed_valent_pred[0][1]
@@ -1618,44 +1644,53 @@ class eels_rf_setup():
                 last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][0]
             trues = np.asarray(self.mixed_valent_pred).T[3]
 
-            plt.figure(figsize=(8, 7))
-            plt.title('Experimental Mixtures Cu(0) to Cu(II)', fontsize=16)
+            plt.figure(figsize=(8, 6))
+            plt.title(prediction_type + ' Experimental Mixtures Cu(0) to Cu(II)', fontsize=16)
 
         predictions_mean = np.asarray(self.mixed_valent_pred).T[0]
         predictions_median = np.asarray(self.mixed_valent_pred).T[1]
         prediction_std = np.asarray(self.mixed_valent_pred).T[2]
+        prediction_mode = np.asarray(self.mixed_valent_pred).T[4]
 
-        self.mixed_valent_summary = [predictions_mean, predictions_median, prediction_std, trues]
+
+        self.mixed_valent_summary = [predictions_mean, predictions_median, prediction_std, trues, prediction_mode]
 
 
         # print(len(count))
-
         if prediction_type == 'Median':
+            plt.plot(trues, predictions_median, color='k', zorder=0)
+            if show_err:
+                plt.errorbar(trues, predictions_median, yerr = prediction_std, color = 'k', zorder=0)
             sc = plt.scatter(trues, predictions_median, s=100, c=prediction_std, vmin=min_std,
                              vmax=max_std)
         if prediction_type == 'Mean':
-            plt.errorbar(trues, predictions_mean, yerr = prediction_std, color = 'k', zorder=0)
+            if show_err:
+                plt.errorbar(trues, predictions_mean, yerr = prediction_std, color = 'k', zorder=0)
             sc = plt.scatter(trues, predictions_mean, s=100, c=prediction_std, vmin=min_std,
                              vmax=max_std)
-        # cb = plt.colorbar(sc, label='Prediction Std')
-        # print(len(count))
+        if prediction_type == 'Mode':
+            plt.plot(trues, prediction_mode, color = 'k', zorder=0)
+            if show_err:
+                plt.errorbar(trues, prediction_mode, yerr = prediction_std, color = 'k', zorder=0)
+            sc = plt.scatter(trues, prediction_mode, s=100, c=prediction_std, vmin=min_std,
+                             vmax=max_std)
+        cb = plt.colorbar(sc, label='Prediction Std')
         if catagory == '0-2':
             plt.plot(np.linspace(0,2,21), np.linspace(0,2,21), color='k', linestyle='--', linewidth=3)
         else:
-            # bot = round(min(min(trues), min(predictions_mean))-0.1, 1)
-            # top = round(max(max(trues), max(predictions_mean))+0.1, 1)
-            pass
-            # plt.plot(np.linspace(bot, top, 5),
-            #          np.linspace(bot, top, 5),
-            #          color='k', linestyle='--', linewidth=3)
+            bot = round(min(min(trues), min(predictions_mean))-0.1, 1)
+            top = round(max(max(trues), max(predictions_mean))+0.1, 1)
 
-        # ax = cb.ax
-        # text = ax.yaxis.label
-        # font = matplotlib.font_manager.FontProperties(size=28)
-        # text.set_font_properties(font)
-        # for t in cb.ax.get_yticklabels():
-        #     t.set_fontsize(14)
-            # t.set_weight('bold')
+            plt.plot(np.linspace(bot, top, 5),
+                     np.linspace(bot, top, 5),
+                     color='k', linestyle='--', linewidth=3)
+
+        ax = cb.ax
+        text = ax.yaxis.label
+        font = matplotlib.font_manager.FontProperties(size=28)
+        text.set_font_properties(font)
+        for t in cb.ax.get_yticklabels():
+            t.set_fontsize(20)
 
         if catagory == '0-1':
             plt.xticks([0,0.25,0.5,0.75,1, 1.25, 1.5], fontsize=18)
@@ -1675,13 +1710,13 @@ class eels_rf_setup():
             plt.xticks([0,0.5,1,1.5,2], fontsize=18)
         else:
             plt.xticks(fontsize = 18)
-        if prediction_type == 'Mean':
-            pass
+        # if prediction_type == 'Mean':
+        #     pass
 
 
-        if prediction_type == 'Median':
-            plt.xlim([round(min(trues, predictions_median)-0.1, 1), round(max(trues, predictions_median)+0.1, 1)])
-            plt.ylim([round(min(trues, predictions_median)-0.1, 1), round(max(trues, predictions_median)+0.1, 1)])
+        # if prediction_type == 'Median':
+        #     plt.xlim([round(min(trues, predictions_median)-0.1, 1), round(max(trues, predictions_median)+0.1, 1)])
+        #     plt.ylim([round(min(trues, predictions_median)-0.1, 1), round(max(trues, predictions_median)+0.1, 1)])
 
         plt.yticks(fontsize=18)
         plt.xlabel('True Value', fontsize=28)
@@ -1730,7 +1765,7 @@ class eels_rf_setup():
             label_fontsizes = [18, 18, 18]
             for mat in self.prediction_df['Material'].unique():
                 subdf = self.prediction_df.loc[self.prediction_df['Material'] == mat]
-                print(len(subdf))
+                # print(len(subdf))
                 if len(subdf) != 0:
                     # make scatterplot of each shift series
                     full_output = [['Shift (eV)', 'Prediction', 'Prediction STD', 'True Oxidation State']]
@@ -2220,7 +2255,7 @@ class eels_rf_setup():
                          self.spectra_df.iloc[theory_index][theory_column]),
                      label='From FEFF', linewidth=3)
             plt.legend()
-            if save_all_figures:
+            if savefigure:
                 plt.savefig(material + ' Post Cropping Spectrum.pdf', bbox_inches='tight', transparent=True)
             plt.show()
             # plt.plot(self.spectra_df.iloc[theory_index][self.energy_col],
@@ -2239,7 +2274,7 @@ class eels_rf_setup():
                 material = 'Cu2O'
             plt.plot(self.final_energies, self.intensities_final,
                      label='Experimental Spectrum', linewidth=4, zorder=10)
-            if savefigure:
+            if save_all_figures:
                 plt.savefig(material + ' Exp Spectrum.pdf', bbox_inches='tight', transparent=True)
             plt.show()
 
@@ -2327,12 +2362,6 @@ class eels_rf_setup():
             pred_median = np.median(predictions_full)
             predictions_std = np.std(predictions_full)
 
-            if print_prediction:
-                print('Prediction Median = ' + str(round(pred_median, 2)))
-                print('prediction = ' + str(round(pred[0], 2)))
-                print('prediction std = ' + str(round(predictions_std, 2)))
-                print(' ')
-
             if prediction_type == 'Median':
                 self.prediction = round(pred_median, 2)
             if prediction_type == 'Mean':
@@ -2403,7 +2432,9 @@ class eels_rf_setup():
                 hist = plt.hist(predictions_full, edgecolor='k', facecolor='grey', fill=True, linewidth=5,
                                 bins = np.linspace(0, 2.6, 14))
                 height = max(hist[0])
-
+                height_ind = list(hist[0]).index(height)
+                pred_mode = (hist[1][height_ind] + 0.1)
+                plt.bar(pred_mode, height, width = 0.2, color = 'lavender', label = 'Mode')
                 # plt.vlines(np.median(predictions_full), 0, height,
                 # color = 'purple', label = 'Median Prediction', linewidth = 5)
                 plt.vlines(self.spectra_df.iloc[theory_index]['BV Used For Alignment'],
@@ -2435,6 +2466,19 @@ class eels_rf_setup():
                 # plt.legend(fontsize=20,  loc='center left', bbox_to_anchor=(1, 0.5))
                 # plt.plot(np.arange(0,max(errors),0.1), np.arange(0,max(errors),0.1), color = 'k', linewidth = 3, linestyle = '--')
                 plt.show()
+        else:
+            hist = np.histogram(predictions_full,
+                            bins=np.linspace(0, 2.6, 14))
+            height = max(hist[0])
+            height_ind = list(hist[0]).index(height)
+            pred_mode = (hist[1][height_ind] + 0.1)
+
+        if print_prediction:
+            print('Prediction Mode = ' + str(round(pred_mode, 2)))
+            print('Prediction Median = ' + str(round(pred_median, 2)))
+            print('Prediction = ' + str(round(pred[0], 2)))
+            print('Prediction Std = ' + str(round(predictions_std, 2)))
+            print(' ')
 
     def show_feature_importances(self, material_type='Cu', savefigure=False, yticks = []):
         """
