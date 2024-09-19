@@ -1,7 +1,7 @@
 # ML_XAS_EELS
 
 
-The code in this repo accompanies "Supervised Machine Learning Prediction of the Cu Oxidation State from EELS Spectra."
+The code in this repo accompanies "Prediction of the Cu oxidation state from EELS and XAS spectra using supervised machine learning."
 
 The "Paper_Figures.ipynb" notebook reproduces all the plots that comprise the 6 main text figures and 16 SI figures in the paper. Headers designate which figures are being produced by the code in that region.
 
