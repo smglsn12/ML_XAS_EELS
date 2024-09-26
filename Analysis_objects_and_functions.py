@@ -277,7 +277,7 @@ class eels_rf_setup():
                     self.spectra_df.loc[self.spectra_df.mpid_string == 'mp-1692'][theory_spec_col])
 
         if compare_to_lit:
-            plt.plot(np.asarray(energies) + lit_shift, broadened_intens, label='Liturature XAS', linewidth=3,
+            plt.plot(np.asarray(energies) + lit_shift, broadened_intens, label='Literature XAS', linewidth=3,
                      color='#1f77b4')
 
         if show_feff:
@@ -371,7 +371,8 @@ class eels_rf_setup():
                     bbox_inches='tight', transparent=True)
 
     def visualize_mixture_addition(self, column = 'BV Used For Alignment', include_mixtures=False, right_y_ticks = False,
-                                   savefigure = False, bins = []):
+                                   savefigure = False, bins = (), include_y_label = True, title = '',
+                                   title_font_size = 14):
 
         """
         Displays the spread of spectra in the dataset corresponding to each oxidation state. Can show either only
@@ -410,16 +411,17 @@ class eels_rf_setup():
                     mixture_values.append(self.spectra_df.iloc[i][column])
             ax1.hist(mixture_values, bins=bins, color='#d62728')
 
-        # plt.title('Spectra Per Oxidation State', fontsize=32)
 
         font = font_manager.FontProperties(
             weight='bold',
             style='normal', size=22)
         plt.xlabel('Oxidation State', fontsize=36)
-        plt.ylabel('Number of Spectra', fontsize = 36)
+        if include_y_label:
+            plt.ylabel('Number of Spectra', fontsize = 36)
         plt.xlim([-0.2, 2.2])
         plt.xticks([0, 1, 2], fontsize=36)
         plt.yticks([0, 400, 800, 1200], fontsize=36)
+        plt.title(title, fontsize = title_font_size)
         if savefigure:
             if include_mixtures:
                 plt.rcParams['pdf.fonttype'] = 'truetype'
