@@ -13,4 +13,4 @@ The remaining files in this repo are the small datasets included for visualizati
 
 Of the five directories, three contain spectra analyzed by this work (Cu_deconvolved_spectra, Additional_Literature_Spectra and xas paper), the fourth contains the saved plots from "Paper_Figures.ipynb" and the final figure files, and the fifth contains the scripts used to generate the data used by this work. The data files can be found at https://drive.google.com/drive/folders/1hsffSo7_6LB5TfsfH9-85lvbodeZTDUC?usp=sharing
 
-Relevant versions: python version 3.10.12 pandas version 1.5.3 numpy version 1.26.2 sklearn version 1.0.2 matplotlib version 3.7.1 joblib version 1.1.0
+Relevant versions: python version 3.10.12 pandas version 1.5.3 numpy version 1.26.2 sklearn version 1.0.2 matplotlib version 3.7.1 joblib version 1.1.0. A .yml file is also included and can be used to generate an environment for running this repo. 

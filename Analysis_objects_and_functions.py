@@ -67,8 +67,12 @@ class eels_rf_setup():
         :param filename: the name of the resulting dataframe (string)
         :param show_plots: whether to show various plots as the function runs (bool)
         :param baseline_subtract: whether to baseline subtract the noisy spectra (bool) should remain false
-        :return: nothing, outputted dataframe is saved as the inputted filename (unless no filename is inputted,
-        then the outputted dataframe is returned)
+        :param stds: the inverse of the noise standard deviations to use. The true standard deviation will be
+        1/this_value (tuple/list/ndarray)
+        :param num_random_seeds: the number of random noise profiles averaged together to determine the impact of noise
+        on the model's accuracy (int)
+        :return: outputted dataframe is saved as the inputted filename, unless no filename is inputted,
+        then the outputted dataframe is returned
         """
         # define accumulators used throughout the script
         full_noise_analysis_output = []
@@ -202,10 +206,11 @@ class eels_rf_setup():
         else:
             return full_noise_df
 
-    def compare_simulation_to_experiment(self, material='CuO', savgol_params=[51, 3],
-                                         xlims=[920, 980], show_feff=False, feff_shift=-10,
+    def compare_simulation_to_experiment(self, material='CuO', savgol_params=(51, 3),
+                                         xlims=(920, 980), show_feff=False, feff_shift=-10,
                                          compare_to_lit=False, lit_spectrum=None, lit_shift=0.0, title=None,
-                                         show_experiment = True, savefigure=False, theory_spec_col = 'TEAM_1_aligned_925_970'):
+                                         show_experiment = True,
+                                         savefigure=False, theory_spec_col = 'TEAM_1_aligned_925_970'):
         """
         Creates a plot comparing any combination of simulated XAS, experimental EELS and literature XAS spectra
 
@@ -222,11 +227,13 @@ class eels_rf_setup():
         energy axis, so a positive number moves the spectrum in the negative direction
         :param title: title of the comparison plot (string)
         :param show_experiment: whether to show the experimental spectrum in the comparison plot (bool)
+        :param savefigure: whether to save the resulting figure (bool)
+        :param theory_spec_col: the column of the spectral df to compare to the experimental spectra (string)
         :return: Shows comparison plot set to the above specifications
         """
 
         # load and plot experimental spectrum
-        output = nio.dm.dmReader("C:/Users/smgls/Materials_database/" + material + " Deconvolved Spectrum.dm4")
+        output = nio.dm.dmReader("Cu_deconvolved_spectra/" + material + " Deconvolved Spectrum.dm4")
         intens = output['data']
         energies = output['coords'][0]
 
@@ -305,12 +312,11 @@ class eels_rf_setup():
         :param cu_fraction: amount the Cu metal material contributes to the mixture (float between 0 and 1)
         :param cu2o_fraction: amount the Cu (I) material contributes to the mixture (float between 0 and 1)
         :param cuo_fraction: amount the Cu (II) material contributes to the mixture (float between 0 and 1)
-
         NOTE - cu_fraction, cu2o_fraction and cuo_fraction must add to 1!
-
         :param include_ticks: whether to include ticks in the plot (bool)
         :param include_title: whether to include a title in the plot (bool)
         :param savefigure: whether to save the plot as a pdf (bool)
+        :param theory_spec_col: the column of the spectral df to draw the simulated spectra from (string)
         :return: none, plot is displayed
         """
 
@@ -380,6 +386,12 @@ class eels_rf_setup():
 
         :param column: column from the dataframe to extract the oxidation state labels from (string)
         :param include_mixtures: whether to display mixed valent spectra in the plot (bool)
+        :param right_y_ticks: whether to include ticks on the right yaxis (bool)
+        :param savefigure: whether to save the resulting figure (bool)
+        :param bins: the bins to use for the histogram of mixtures (list/tuple/ndarray)
+        :param include_y_label: whether to include a label on the yaxis (bool)
+        :param title: plot title (string)
+        :param title_font_size: the title's font size (int)
         :param savefigure: whether to save the plot as a pdf (bool)
         :return: none, the plot is displayed
         """
@@ -430,13 +442,15 @@ class eels_rf_setup():
                 plt.rcParams['pdf.fonttype'] = 'truetype'
                 plt.savefig('Full Dataset.pdf', bbox_inches='tight', transparent=True)
 
-    def visualize_predictions(self, indicies, show_cu_oxide_reference = False, theory_spec_col = 'TEAM_1_aligned_925_970'):
+    def visualize_predictions(self, indicies, show_cu_oxide_reference = False,
+                              theory_spec_col = 'TEAM_1_aligned_925_970'):
         """
         Visualize a specific prediction from the test set. Includes a plot of the spectrum and the
         prediction histogram for that spectrum
 
-        :param indicies: row in error dataframe to extract the prediction from
-        :param show_cu_oxide_reference: whether to also plot reference spectra for Cu metal, Cu (I) and Cu (II)
+        :param indicies: row in error dataframe to extract the prediction from (int)
+        :param show_cu_oxide_reference: whether to also plot reference spectra for Cu metal, Cu (I) and Cu (II) (bool)
+        :param theory_spec_col: the column of the spectral df to draw the simulated spectra from (string)
         :return: None, the plot is displayed
         """
         plt.figure(figsize=(10, 8))
@@ -516,6 +530,7 @@ class eels_rf_setup():
         :param include_title: whether to include the title in the plot (bool)
         :param include_ticks: whether to include the ticks in the plot (bool)
         :param savefigure: whether to save the figure as a pdf (bool)
+        :param theory_spec_col: the column of the spectral df to draw the simulated spectra from (string)
         :return: none, plot is displayed
         """
 
@@ -564,7 +579,7 @@ class eels_rf_setup():
         scale and this allows the direct comparison of simulated noise addition to our experimental procedures
         :param interpolation_ranges: list of energy spacings to add to the simulated data test set (list/ndarray)
         :param add_zeros: whether to add zeros at the low energy end of the spectrum (pre onset edge) (bool)
-        :param energy_zeros: the energy for the added zeros above to start
+        :param energy_zeros: the energy for the added zeros above to start (int/float)
         :return: Interpolated spectra are added to the error df attribute
         """
 
@@ -643,16 +658,16 @@ class eels_rf_setup():
 
 
 
-    def predict_experiment_folder(self, folder_path, shifts = [0.0], smoothings = [[51,3]], edge_points = [10],
+    def predict_experiment_folder(self, folder_path, shifts = (0.0), smoothings = ((51,3)), edge_points = (10),
                                   spectra_type = 'csv', cumulative_spec = True,
-                                  theory_column = 'XAS_aligned_925_970', energies_range = [925,970], show_hist = False,
+                                  theory_column = 'XAS_aligned_925_970', energies_range = (925,970), show_hist = False,
                                   show_plots = False, show_inputted_spectrum=False, print_details = False,
-                                  savefigure = False, theory_indicies = [], baseline_subtract_csv=True,
+                                  savefigure = False, theory_indices = (),
                                   prediction_type = 'Mean',
                                   model_type = 'regression', check_alignment = False):
         """
         Wrapper function for predicting all XAS/EELS spectra in a folder. All spectra in that folder must be of the
-        same file type (ie csv or dm4). This function calls the 'predict_experiment_random_forest' function for each
+        same file type (csv or dm4). This function calls the 'predict_experiment_random_forest' function for each
         spectrum in the folder with the specified set of conditions constant for each spectrum.
         :param folder_path: filepath to the spectra folder (string)
         :param shifts: energy axis scaling to be done to the spectra (float)
@@ -668,12 +683,19 @@ class eels_rf_setup():
         :param energies_range: the range of energy axis values for the experimental spectrum to be able to match
         simulations (list of int)
         :param show_hist: whether to show a histogram of predictions of each decision tree (bool)
-        :param show_plots: whether to show a series of plots illustrating each trainsformation done to the spectrum
+        :param show_plots: whether to show a series of plots illustrating each transformation done to the spectrum
         as the function runs (bool)
         :param show_inputted_spectrum: whether to plot the inputted spectrum for visualization purposes (bool)
         :param print_details: whether to print the predicted oxidation state and standard deviation (bool)
         :param savefigure: whether to save all these plots (bool)
-        :return:
+        :param theory_indices: the indices of the spectral dataset to compare to the inputted experimental spectra
+        (tuple/list/ndarray of int)
+        :param prediction_type: how to aggregate the 500 decision tree predictions into the model's overall predictions.
+        Options are Mean and Median (string)
+        :param model_type: the type of prediction model to use. Options are regression and categorical. Must match
+        the training data used for generating the model (string)
+        :param check_alignment: whether to plot exp vs theory post optional manual energy axis shift (bool)
+        :return: Specified prediction visualizations are shown
 
         """
         # grab paths to spectra
@@ -690,7 +712,7 @@ class eels_rf_setup():
                             print('Energy Axis Shift = ' + str(shift))
                             print('Smoothing Parameters = ' + str(smooth))
                         if 'Cu Metal' in path:
-                            self.predict_experiment_random_forest(path, theory_indicies[0], 'Cu Metal',
+                            self.predict_experiment_random_forest(path, theory_indices[0], 'Cu Metal',
                                                                   model_type=model_type,
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
@@ -704,12 +726,11 @@ class eels_rf_setup():
                                                                   show_inputted_spectrum = show_inputted_spectrum,
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
-                                                                  baseline_subtract_csv = baseline_subtract_csv,
                                                                   prediction_type=prediction_type,
                                                                   check_alignment = check_alignment)
 
                         elif 'Cu2O' in path:
-                            self.predict_experiment_random_forest(path, theory_indicies[1], 'Cu2O',
+                            self.predict_experiment_random_forest(path, theory_indices[1], 'Cu2O',
                                                                   model_type=model_type,
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
@@ -723,12 +744,11 @@ class eels_rf_setup():
                                                                   show_inputted_spectrum = show_inputted_spectrum,
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
-                                                                  baseline_subtract_csv = baseline_subtract_csv,
                                                                   prediction_type=prediction_type,
                                                                   check_alignment = check_alignment)
 
                         elif 'CuO' in path:
-                            self.predict_experiment_random_forest(path, theory_indicies[2], 'CuO',
+                            self.predict_experiment_random_forest(path, theory_indices[2], 'CuO',
                                                                   model_type=model_type,
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
@@ -742,14 +762,13 @@ class eels_rf_setup():
                                                                   show_inputted_spectrum = show_inputted_spectrum,
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
-                                                                  baseline_subtract_csv = baseline_subtract_csv,
                                                                   prediction_type=prediction_type,
                                                                   check_alignment = check_alignment)
 
                         else:
                             p = Path(path)
                             name = p.parts[1]
-                            self.predict_experiment_random_forest(path, theory_indicies[0], name,
+                            self.predict_experiment_random_forest(path, theory_indices[0], name,
                                                                   model_type=model_type,
                                                                   exp_spectrum_type=spectra_type,
                                                                   smoothing_parms=smooth,
@@ -763,7 +782,6 @@ class eels_rf_setup():
                                                                   show_inputted_spectrum = show_inputted_spectrum,
                                                                   print_prediction=print_details,
                                                                   savefigure=savefigure,
-                                                                  baseline_subtract_csv = baseline_subtract_csv,
                                                                   prediction_type=prediction_type,
                                                                   check_alignment = check_alignment)
 
@@ -793,11 +811,12 @@ class eels_rf_setup():
 
     def broaden_spec(self, E, osc, sigma, x, gamma):
         """
-        Generates a spectrum broadened by gaussian broadening
+        Generates a spectrum broadened by voigt broadening
         :param E: energy vales for the spectrum (list/ndarray)
         :param osc: intensity values for the spectrum (list/ndarray)
-        :param sigma: gausian distribution standard deviation (float)
+        :param sigma: Gausian distribution standard deviation (float)
         :param x: energy vales for the spectrum (list/ndarray)
+        :param gamma: the Lorentzian parameter combined into the voigt profile (float)
         :return: broadened spectrum (list)
         """
         gE = []
@@ -811,17 +830,9 @@ class eels_rf_setup():
     def predict_Experimental_Cu_non_integers(self, cu_metal=1, cu2o=0, cuo=0,
                                              show_predicted_spectrum = True,
                                  show_plots = False, print_predictions = False,
-                                folder_path = 'C:/Users/smgls/Materials_database/Cu_deconvolved_spectra',
-                                folder_path_type = 'TEAM I',
-                                smoothing_params = [51,3],
-                                energies_range = [925, 970],
-                                exp_scale = 0.1,
-                                exp_broadening = None,
-                                savefig = False,
-                                show_hists = True,
-                                             true_val_from_label = None,
-                                             prediction_type = 'Categorical',
-                                             spectrum_shift = 0.0):
+                                folder_path = 'Cu_deconvolved_spectra', folder_path_type = 'TEAM I',
+                                smoothing_params = (51,3), energies_range = (925, 970), exp_scale = 0.1, savefig = False,
+                                show_hists = True, true_val_from_label = None, model_type = 'Regression', spectrum_shift = 0.0):
         """
         Generates an experimental mixed valent spectrum for a set of integer valent ratios and predicts that spectrum.
         Generates both raw spectrum and cumulative spectrum but only predicts the cumulative spectrum
@@ -832,10 +843,15 @@ class eels_rf_setup():
         :param show_plots: whether to show a broader set of plots showing how the mixture spectrum is comprised
         of the integer spectra (bool)
         :param print_predictions: whether to print the prediction and prediction std (bool)
-        :param folder_path: path to folder containing integer valent spectra
+        :param folder_path: path to folder containing integer valent spectra (string)
         :param smoothing_params: window size and polynomial order for savgol filter smoothing (list of int)
         :param energies_range: energy range to crop the experimental spectra to (list of int)
         :param exp_scale: energy axis scale for the experimental spectrum (float)
+        :param savefig: whether to save the resulting figure (bool)
+        :param show_hists: whether to show the prediction histograms for each mixture (bool)
+        :param true_val_from_label: the labeled oxidation state value for this spectrum (float)
+        :param model_type: which oxidation state prediction model type to use, Categorical or Regression (string)
+        :param spectrum_shift: how much to shift the energy axis of the spectrum by (float)
         :return: predicts mixed valent spectrum and stores its predictions in 'mixed_valent_pred'
         """
         self.spectrum_energy_shift = spectrum_shift
@@ -1042,10 +1058,10 @@ class eels_rf_setup():
 
 
         predictions_full = np.asarray(predictions_full_temp).T[0]
-        if prediction_type == 'Regression':
+        if model_type == 'Regression':
             median_pred = np.median(predictions_full)
             predictions_std = np.std(predictions_full)
-        if prediction_type == 'Categorical':
+        if model_type == 'Categorical':
             pred_df_temp = pd.DataFrame(predictions_full, columns=['Full_predictions'])
             # print(pred_df_temp)
             # print(pred_df_temp.Full_predictions)
@@ -1058,7 +1074,7 @@ class eels_rf_setup():
 
         if print_predictions:
             print('prediction = ' + str(round(pred[0], 2)))
-            if prediction_type == 'Regression':
+            if model_type == 'Regression':
                 print('Prediction Median = ' + str(round(median_pred, 2)))
             print('prediction std = ' + str(round(predictions_std, 2)))
         hist = np.histogram(predictions_full,
@@ -1075,7 +1091,7 @@ class eels_rf_setup():
         #        np.median(np.asarray(predictions_full_temp).T[2][0])])
 
         if show_hists:
-            if prediction_type == 'Regression':
+            if model_type == 'Regression':
 
                 plt.figure(figsize=(6,5))
                 hist = plt.hist(predictions_full, edgecolor='k', facecolor='grey', fill=True, linewidth=5,
@@ -1117,7 +1133,7 @@ class eels_rf_setup():
                 plt.legend(fontsize = 14, bbox_to_anchor=(1.8, 0.7))
                 plt.show()
 
-            if prediction_type == 'Categorical':
+            if model_type == 'Categorical':
                 plt.style.use('default')
                 xvals = []
                 heights = []
@@ -1143,7 +1159,7 @@ class eels_rf_setup():
 
         # store prediction statistics
 
-        if prediction_type == 'Categorical':
+        if model_type == 'Categorical':
             self.prediction_mean = pred[0]
             self.prediction_std = round(predictions_std, 2)
             self.true_val = true_val
@@ -1151,7 +1167,7 @@ class eels_rf_setup():
             self.mixed_valent_pred.append([self.prediction_mean, self.prediction_std, self.true_val])
 
 
-        if prediction_type == 'Regression':
+        if model_type == 'Regression':
             try:
                 pred_ag = pred[0][0]*0 + pred[0][1]*1 + pred[0][2]*2
                 self.prediction_mean = round(pred_ag, 2)
@@ -1312,18 +1328,20 @@ class eels_rf_setup():
         # store prediction information
         self.mixed_valent_pred.append([self.prediction, self.prediction_std, self.true_val])
 
-    def simulated_mixed_valent(self, catagory = '0-1', colorbar_range = [0.1, 0.5], savefigure=False,
+    def simulated_mixed_valent(self, category = '0-1', colorbar_range = (0.1, 0.5), savefigure=False,
                                prediction_type = 'Mean'):
         """
         Generates and predicts binary simulated mixture spectra in a range of 50 mixtures from purely the lower
         oxidation state to purely the higher oxidation state. Plots the results by generating a predicted vs true plot
         where the scatter plot colors correspond to the prediction standard deviation and a dashed black line shows
         the location of perfect predictions.
-        :param catagory: types of mixtures to generate and predict, 0-1, 1-2 or 0-2 (string) only supports binary
+        :param category: types of mixtures to generate and predict, 0-1, 1-2 or 0-2 (string) only supports binary
         mixtures
         :param colorbar_range: the range of values for the color bar showing prediction standard deviation (list of
         float)
         :param savefigure: whether to save the plot as a pdf (bool)
+        :param prediction_type: how to aggregate the 500 decision tree predictions into the model's overall predictions.
+        Options are Mean and Median (string)
         :return: None, summary plot is shown and attributes are set based on 'predict_Cu_non_integers' results
         """
         min_std = colorbar_range[0]
@@ -1337,21 +1355,21 @@ class eels_rf_setup():
         cu2o_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-361'].index[0]
         cuo_index = self.spectra_df.loc[self.spectra_df['mpid_string'] == 'mp-704645'].index[0]
 
-        if catagory == '0-1':
+        if category == '0-1':
             # if mixtures of 0 and 1 fix Cu(II) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(first_comp[i], second_comp[i], 0, cu_int_indicies=(cu_metal_index, cu2o_index, cuo_index))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(0) to Cu(I)', fontsize=23)
 
-        elif catagory == '1-2':
+        elif category == '1-2':
             # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(0, first_comp[i], second_comp[i], cu_int_indicies=(cu_metal_index, cu2o_index, cuo_index))
             plt.figure(figsize=(8, 7))
             plt.title('Simulated Mixtures Cu(I) to Cu(II)', fontsize=23)
 
-        elif catagory == '0-2':
+        elif category == '0-2':
             # if mixtures of 0 and 2 fix Cu(I) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 self.predict_Cu_non_integers(first_comp[i], 0, second_comp[i], cu_int_indicies=(cu_metal_index, cu2o_index, cuo_index))
@@ -1361,11 +1379,11 @@ class eels_rf_setup():
         # build list of prediction details based on values stored in 'predict_Cu_non_integers'
         trues = np.asarray(self.mixed_valent_pred).T[2]
         predictions_mean = np.asarray(self.mixed_valent_pred).T[0]
-        # predictions_median = np.asarray(self.mixed_valent_pred).T[1]
         prediction_std = np.asarray(self.mixed_valent_pred).T[1]
         # print(len(count))
 
         if prediction_type == 'Median':
+            predictions_median = np.asarray(self.mixed_valent_pred).T[1]
             sc = plt.scatter(trues, predictions_median, s=100, c=prediction_std, vmin=min_std,
                          vmax=max_std)
         if prediction_type == 'Mean':
@@ -1387,13 +1405,33 @@ class eels_rf_setup():
         plt.xlabel('True Value', fontsize=24)
         plt.ylabel('Bond Valance Prediction', fontsize=24)
         if savefigure:
-            plt.savefig('Simulated Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
+            plt.savefig('Simulated Mixtures ' + category + '.pdf', bbox_inches='tight', transparent=True)
 
 
-    def categorical_experimental_mixed_valent(self, catagory = '0-1', smoothing_params = [51,3], show_plots = False,
-                                  show_predicted_spectrum = False, colorbar_range = [0.1, 0.5], savefigure=False,
-                                  exp_broadening = None, print_predictions = False,
-                                  show_hists = True, true_vals = [], energies_range = [925, 970]):
+    def categorical_experimental_mixed_valent(self, category = '0-1', smoothing_params = (51,3), show_plots = False,
+                                  show_predicted_spectrum = False, colorbar_range = (0.1, 0.5), savefigure=False,
+                                  print_predictions = False,
+                                  show_hists = True, true_vals = (), energies_range = (925, 970)):
+        """
+        Generates an experimental mixed valent spectrum for a set of integer valent ratios and predicts that spectrum.
+        Generates both raw spectrum and cumulative spectrum but only predicts the cumulative spectrum. Set up to work
+        with a categorical prediction model (RandomForestClassifier). The categorical model was not found to improve
+        model performance, and is not recommended to be used.
+        :param category: types of mixtures to generate and predict, 0-1 or 1-2 (string) only supports binary
+        mixtures
+        :param smoothing_params: window size and polynomial order for savgol filter smoothing (list of int)
+        :param show_plots: whether to show a broader set of plots showing how the mixture spectrum is comprised
+        of the integer spectra (bool)
+        :param colorbar_range: the range of values for the color bar showing prediction standard deviation (list of
+        float)
+        :param show_predicted_spectrum: whether to make a plot showing the spectrum fed into the model (bool)
+        :param savefigure: whether to save the plot as a pdf (bool)
+        :param print_predictions: whether to print the prediction and prediction std (bool)
+        :param show_hists: whether to show the prediction histograms for each mixture (bool)
+        :param true_vals: the labeled oxidation state values for this set of mixture spectra (float)
+        :param energies_range: energy range to crop the experimental spectra to (list of int)
+        :return: predicts mixed valent spectrum and stores its predictions in 'mixed_valent_pred'
+        """
 
         min_std = colorbar_range[0]
         max_std = colorbar_range[1]
@@ -1401,7 +1439,7 @@ class eels_rf_setup():
         second_comp = list(np.linspace(0, 1, 21))
         self.reset_mixed_valent_series()
 
-        if catagory == '0-1':
+        if category == '0-1':
             # if mixtures of 0 and 1 fix Cu(II) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 # print(first_comp[i] + second_comp[i])
@@ -1409,11 +1447,10 @@ class eels_rf_setup():
                                                           show_plots=show_plots,
                                                           show_predicted_spectrum=show_predicted_spectrum,
                                                           smoothing_params=smoothing_params,
-                                                          exp_broadening=exp_broadening,
                                                           print_predictions=print_predictions,
                                                           show_hists=show_hists, true_val_from_label=true_vals,
                                                           energies_range = energies_range,
-                                                          prediction_type='Categorical')
+                                                          model_type='Categorical')
 
 
             trues = []
@@ -1428,7 +1465,7 @@ class eels_rf_setup():
             plt.figure(figsize=(8, 7))
             plt.title('Experimental Cu(0) to Cu(I)', fontsize=26)
 
-        elif catagory == '1-2':
+        elif category == '1-2':
             # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 # print(first_comp[i] + second_comp[i])
@@ -1436,10 +1473,9 @@ class eels_rf_setup():
                                                           show_plots=show_plots,
                                                           show_predicted_spectrum=show_predicted_spectrum,
                                                           smoothing_params=smoothing_params,
-                                                          exp_broadening=exp_broadening,
                                                           show_hists=show_hists, true_val_from_label=true_vals,
                                                           energies_range = energies_range,
-                                                          prediction_type='Categorical')
+                                                          model_type='Categorical')
 
             trues = []
             for i in range(0, len(first_comp)):
@@ -1447,34 +1483,6 @@ class eels_rf_setup():
             # trues = np.asarray(test_rf_obj.mixed_valent_pred).T[2]
             plt.figure(figsize=(8, 7))
             plt.title('Experimental Cu(I) to Cu(II)', fontsize=26)
-
-
-        elif catagory == '0-2':
-            for i in range(0, len(first_comp)):
-                # print(first_comp[i] + second_comp[i])
-                self.predict_Experimental_Cu_non_integers(cu_metal=first_comp[i], cu2o=0, cuo=second_comp[i],
-                                                          show_plots=show_plots,
-                                                          show_predicted_spectrum=show_predicted_spectrum,
-                                                          smoothing_params=smoothing_params,
-                                                          exp_broadening=exp_broadening,
-                                                          print_predictions=print_predictions,
-                                                          show_hists=show_hists,
-                                                          energies_range = energies_range,
-                                                          prediction_type='Categorical')
-            if prediction_type == 'Median':
-                first_pred = self.mixed_valent_pred[0][1]
-            if prediction_type == 'Mean':
-                first_pred = self.mixed_valent_pred[0][0]
-
-            if prediction_type == 'Median':
-                last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][1]
-            if prediction_type == 'Mean':
-                last_pred = self.mixed_valent_pred[len(self.mixed_valent_pred) - 1][0]
-            trues = []
-            for i in range(0, len(first_comp)):
-                trues.append(first_comp[i] * first_pred + second_comp[i] * last_pred)
-            plt.figure(figsize=(8, 7))
-            plt.title('Experimental Mixtures Cu(0) to Cu(II)', fontsize=22, fontweight='bold')
 
         predictions_mean = np.asarray(self.mixed_valent_pred).T[0]
         prediction_std = np.asarray(self.mixed_valent_pred).T[1]
@@ -1501,24 +1509,22 @@ class eels_rf_setup():
         plt.xlabel('True Value', fontsize=28)
         plt.ylabel('Bond Valance Prediction', fontsize=28)
         if savefigure:
-            plt.savefig('Experimental Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
+            plt.savefig('Experimental Mixtures ' + category + '.pdf', bbox_inches='tight', transparent=True)
 
 
-
-
-    def experimental_mixed_valent(self, catagory = '0-1', smoothing_params = (51,3), show_plots = False,
+    def experimental_mixed_valent(self, category = '0-1', smoothing_params = (51,3), show_plots = False,
                                   show_predicted_spectrum = False, colorbar_range = (0.1, 0.5), savefigure=False,
-                                  exp_broadening = None, print_predictions = False, prediction_type='Mean',
+
+                                  print_predictions = False, prediction_type='Mean',
                                   show_hists = True, true_vals = (), first_comp = (), second_comp = (),
-                                  num_mixed_vals = 20,
+                                  num_mixed_vals = 20, model_type = 'Regression',
                                   folder_path = 'C:/Users/smgls/Materials_database/Cu_deconvolved_spectra',
                                   folder_path_type = 'TEAM I',
                                   spectrum_shift = 0.0,
                                   show_err = True):
         """
         This function is very similar to 'simulated_mixed_valent' except its using experimetnal spectra instead
-
-        :param catagory: types of mixtures to generate and predict, 0-1, 1-2 or 0-2 (string) only supports
+        :param category: types of mixtures to generate and predict, 0-1, 1-2 or 0-2 (string) only supports
         binary mixtures
         :param smoothing_params: window size and polynomial order for savgol filter smoothing (list of int)
         :param show_predicted_spectrum: whether to make a plot showing the spectrum fed into the model (bool)
@@ -1527,7 +1533,20 @@ class eels_rf_setup():
         :param colorbar_range: the range of values for the color bar showing prediction standard deviation
         (list of float)
         :param savefigure: whether to save the plot as a pdf (bool)
-        :return:
+        :param print_predictions: whether to print the prediction and prediction std (bool)
+        :param prediction_type: how to aggregate the 500 decision tree predictions into the model's overall predictions.
+        Options are Mean and Median (string)
+        :param show_hists: whether to show the prediction histograms for each mixture (bool)
+        :param true_vals: the labeled oxidation state values for this set of mixture spectra (list)
+        :param first_comp: the contribution of the lower oxidation state (list)
+        :param second_comp: the contribution of the higher oxidation state (list)
+        :param num_mixed_vals: the number of evenly spaced oxidation state mixtures to create (int)
+        :param model_type: which oxidation state prediction model type to use, Categorical or Regression (string)
+        :param folder_path: where the experimental spectra to be mixed are located (string)
+        :param folder_path_type: the filetype of the experimental spectra (TEAM I or csv) (string)
+        :param spectrum_shift: how much to shift the spectrum on the energy axis (float)
+        :param show_err: whether to show the standard deviation of the prediction (bool)
+        :return: predicts mixed valent spectrum and stores its predictions in 'mixed_valent_pred'
         """
         np.random.seed(32)
 
@@ -1539,7 +1558,7 @@ class eels_rf_setup():
             second_comp = list(np.linspace(0,1,num_mixed_vals))
         self.reset_mixed_valent_series()
 
-        if catagory == '0-1':
+        if category == '0-1':
             # if mixtures of 0 and 1 fix Cu(II) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 # print(first_comp[i] + second_comp[i])
@@ -1547,10 +1566,9 @@ class eels_rf_setup():
                                                                  show_plots=show_plots,
                                                           show_predicted_spectrum=show_predicted_spectrum,
                                                              smoothing_params=smoothing_params,
-                                                          exp_broadening=exp_broadening,
                                                           print_predictions=print_predictions,
                                                           show_hists = show_hists, true_val_from_label=true_vals,
-                                                          prediction_type='Regression',
+                                                          model_type=model_type,
                                                           folder_path = folder_path,
                                                           folder_path_type = folder_path_type,
                                                           spectrum_shift = spectrum_shift,
@@ -1579,7 +1597,7 @@ class eels_rf_setup():
             plt.title(prediction_type + ' Experimental Cu(0) to Cu(I)', fontsize=26)
             # plt.xticks([0.3,0.5,0.7,0.9,1.1])
             # plt.yticks([0.3,0.5,0.7,0.9,1.1])
-        elif catagory == '1-2':
+        elif category == '1-2':
             # if mixtures of 1 and 2 fix Cu(0) to zero in 'predict_Cu_non_integers'
             for i in range(0, len(first_comp)):
                 # print(first_comp[i] + second_comp[i])
@@ -1587,9 +1605,8 @@ class eels_rf_setup():
                                                                  show_plots=show_plots,
                                                           show_predicted_spectrum=show_predicted_spectrum,
                                                                  smoothing_params=smoothing_params,
-                                                          exp_broadening=exp_broadening,
                                                           show_hists = show_hists, true_val_from_label=true_vals,
-                                                          prediction_type='Regression',
+                                                          model_type=model_type,
                                                           folder_path_type = folder_path_type,
                                                           folder_path = folder_path,
                                                           spectrum_shift=spectrum_shift,
@@ -1615,7 +1632,7 @@ class eels_rf_setup():
             plt.title(prediction_type + ' Experimental Cu(I) to Cu(II)', fontsize=26)
 
 
-        elif catagory == '0-2':
+        elif category == '0-2':
 
             comps = np.random.rand(num_mixed_vals, 3)
 
@@ -1627,9 +1644,8 @@ class eels_rf_setup():
                                                                  show_plots=show_plots,
                                                           show_predicted_spectrum=show_predicted_spectrum,
                                                                  smoothing_params=smoothing_params,
-                                                          exp_broadening=exp_broadening,
                                                           show_hists = show_hists, true_val_from_label=true_vals,
-                                                          prediction_type='Regression',
+                                                          model_type=model_type,
                                                           folder_path_type=folder_path_type,
                                                           folder_path=folder_path,
                                                           spectrum_shift=spectrum_shift,
@@ -1677,7 +1693,7 @@ class eels_rf_setup():
             sc = plt.scatter(trues, prediction_mode, s=100, c=prediction_std, vmin=min_std,
                              vmax=max_std)
         cb = plt.colorbar(sc, label='Prediction Std')
-        if catagory == '0-2':
+        if category == '0-2':
             plt.plot(np.linspace(0,2,21), np.linspace(0,2,21), color='k', linestyle='--', linewidth=3)
         else:
             bot = round(min(min(trues), min(predictions_mean))-0.1, 1)
@@ -1694,21 +1710,21 @@ class eels_rf_setup():
         for t in cb.ax.get_yticklabels():
             t.set_fontsize(20)
 
-        if catagory == '0-1':
+        if category == '0-1':
             plt.xticks([0,0.25,0.5,0.75,1, 1.25, 1.5], fontsize=18)
             plt.yticks([0,0.25,0.5,0.75,1, 1.25, 1.5], fontsize=18)
             plt.xlim([-0.1, 1.4])
             plt.ylim([-0.1, 1.4])
             plt.plot(np.linspace(0,1,5), np.linspace(0,1,5), color = 'k', linestyle = '--')
 
-        if catagory == '1-2':
+        if category == '1-2':
             plt.xticks([0.75, 1,1.25,1.5,1.75,2, 2.25, 2.5], fontsize=18)
             plt.yticks([0.75, 1,1.25,1.5,1.75,2, 2.25, 2.5], fontsize=18)
             plt.xlim([0.8, 2.35])
             plt.ylim([0.8, 2.35])
             plt.plot(np.linspace(1,2,5), np.linspace(1,2,5), color = 'k', linestyle = '--')
 
-        if catagory == '0-2':
+        if category == '0-2':
             plt.xticks([0,0.5,1,1.5,2], fontsize=18)
         else:
             plt.xticks(fontsize = 18)
@@ -1725,7 +1741,7 @@ class eels_rf_setup():
         plt.ylabel('Bond Valance Prediction', fontsize=28)
         if savefigure:
             plt.rcParams['pdf.fonttype'] = 'truetype'
-            plt.savefig('Experimental Mixtures ' + catagory + '.pdf', bbox_inches='tight', transparent=True)
+            plt.savefig('Experimental Mixtures ' + category + '.pdf', bbox_inches='tight', transparent=True)
 
     def visualize_shift(self, material = 'All', show_stds = False, show_table = False, savefigure=False,
                         show_shift_labels = False, shift_labels = (0.9, 1.2, 1.2), spectrum_type = 'XAS',
@@ -1744,6 +1760,10 @@ class eels_rf_setup():
         :param show_shift_labels: Whether to draw vertical lines showing the 'true' location of the energy axis
         in the shift series (bool)
         :param shift_labels: the location of the above vertical lines (list/ndarray of float)
+        :param spectrum_type: the type of experimental measurement, XAS or EELS (string)
+        :param show_true_val: whether to plot the true oxidation state (bool)
+        :param theory_index: row numbers in the spectral dataset where the theoretical spectrum matching the
+        experimental spectrum can be found (list)
         :return: shows shift plot and generates a list of vales for each prediction
         """
         if material == 'All':
@@ -1986,11 +2006,10 @@ class eels_rf_setup():
                                           exp_spectrum_type = 'TEAM I',
                                           smoothing_parms = (), exp_scale = 0.1,
                                          points_to_average = 20, cumulative_spectrum = True,
-                                         spectrum_energy_shift = 0.0, energies_range = [925, 970],
+                                         spectrum_energy_shift = 0.0, energies_range = (925, 970),
                                          theory_column = 'XAS_aligned_925_970', print_prediction = True,
                                          use_dnn = False, dnn_model = None, show_plots = False, show_hist = False,
                                          show_inputted_spectrum = True, save_all_figures = False, savefigure = False,
-                                         baseline_subtract_csv=True,
                                          prediction_type = 'Mean',
                                          check_alignment = False):
 
@@ -2003,8 +2022,10 @@ class eels_rf_setup():
         :param theory_index: index in the dataframe corresponding to the simulated spectrum which matches this spectrum.
         This is used to assign a true value to the oxidation state of the experimental spectrum (int)
         :param material: name of the material the spectrum was taken from (string)
-        :param exp_spectrum_type: either TEAM I (opened with ncempy's dm4 reader) or csv (opened with pandas' read_csv)
-        (string)
+        :param model_type: the type of prediction model to use. Options are regression and categorical. Must match
+        the training data used for generating the model (string)
+        :param exp_spectrum_type: either TEAM I (opened with ncempy's dm4 reader) or csv (opened with pandas' read_csv).
+        csv files are baseline subtracted due to unreliability of the baseline from literature extractions. (string)
         :param smoothing_parms: parameters for smoothing with savgol filter (window size and polynomial order) (list
         of int)
         :param exp_scale: energy axis scale for the experimental spectrum (float)
@@ -2019,13 +2040,18 @@ class eels_rf_setup():
         spectrum for visualization and comparison purposes (string)
         :param print_prediction: whether to print the predicted oxidation state and standard deviation (bool)
         :param use_dnn: whether to use a dnn model rather than random forest (bool)
-        :param dnn_model: the dnn model paired with the above (sequential dnn model)
-        :param show_plots: whether to show a series of plots illustrating each trainsformation done to the spectrum
+        :param dnn_model: the dnn model paired with the above (tensorflow sequential dnn model)
+        :param show_plots: whether to show a series of plots illustrating each transformation done to the spectrum
         as the function runs (bool)
         :param show_hist: whether to show a histogram of predictions of each decision tree (bool)
         :param show_inputted_spectrum: whether to plot the inputted spectrum for visualization purposes (bool)
-        :param savefigure: whether to save all these plots (bool)
-        :return:
+        :param save_all_figures: whether to save all these plots (bool)
+        :param savefigure: whether to save select plots (bool)
+        :param prediction_type: how to aggregate the 500 decision tree predictions into the model's overall predictions.
+        Options are Mean and Median (string)
+        :param check_alignment: whether to plot exp vs theory post optional manual energy axis shift (bool)
+        :return: prints predicted oxidation state and shows plots indicating the distribution of predictions across the
+        decision tree models.
         """
         # define attributes
         self.cumulative_spectrum = cumulative_spectrum
@@ -2083,9 +2109,8 @@ class eels_rf_setup():
         if exp_spectrum_type == 'csv':
             # load data
             output = pd.read_csv(exp_spectrum)
-            # Baseline subtract spectrum. This is because the csv file used in this work is extracted from literature
-            # and its baseline is far above zero due to the axes of the literature extraction.
-            # TODO This will need to be updated before broad use with csv data is possible
+            # Baseline subtract spectrum. This is because the csv files used in this work are extracted from literature
+            # and their baselines are far above zero due to the axes of the literature extraction.
             intens_temp = output['Intensity'] - min(output['Intensity'])
             intens = intens_temp / intens_temp[len(intens_temp) - 5]
             intens = list(intens)
@@ -2482,12 +2507,13 @@ class eels_rf_setup():
             print('Prediction Std = ' + str(round(predictions_std, 2)))
             print(' ')
 
-    def show_feature_importances(self, material_type='Cu', savefigure=False, yticks = []):
+    def show_feature_importances(self, material_type='Cu', savefigure=False, yticks = ()):
         """
         Visualize a plot of the feature importances for the model. The feature importances are plotted against the
         spectra energy axis, as each feature corresponds to the intensity at that energy
         :param material_type: Element trained on (string)
         :param savefigure: whether to save the plot as a pdf (bool)
+        :param yticks: the y ticks to use when making the feature importance plot (list)
         :return: none, shows plot
         """
         plt.figure(figsize=(8, 6))
@@ -2577,7 +2603,7 @@ class eels_rf_setup():
 
     def show_mixture_samples_accuracy(self, savefigure = False):
         """
-        Shows the R2 and RMSE plots for the integer samlpes that make up the generated mixed valent spectra
+        Shows the R2 and RMSE plots for the integer samples that make up the generated mixed valent spectra
         :return: None, shows plot
         """
         # find the materials IDs for the materials that make up the mixed valent samples
@@ -2646,7 +2672,7 @@ class eels_rf_setup():
         plt.show()
 
     def show_r2(self, scatter_spot_multiplier = 15, savefigure=False, error_df = None, show_value_counts_plot = False,
-                include_integer=True, prediction_type = 'Mean', colorbar_range = [0.15,0.45]):
+                include_integer=True, prediction_type = 'Mean', colorbar_range = (0.15,0.45)):
         """
         Show the R2 plot for a set of predictions. Predictions and true oxidation states are rounded to the nearest 0.1.
         Scatter plot sizes are scaled to the number of data points at that point and are colored by the average
@@ -2657,6 +2683,11 @@ class eels_rf_setup():
         (pandas dataframe)
         :param show_value_counts_plot: whether to show another plot with scatter points colored by number of values
         rather than prediction standard deviation (bool)
+        :param include_integer: whether to include integer oxidation state values in the visualization (bool)
+        :param prediction_type: how to aggregate the 500 decision tree predictions into the model's overall predictions.
+        Options are Mean and Median (string)
+        :param colorbar_range: the range of values for the color bar showing prediction standard deviation
+        (list of float)
         :return: None, plot is shown
         """
 
@@ -2933,10 +2964,10 @@ class eels_rf_setup():
         :param width_multiplier: with of bar plot scaling (float)
         :param text_height: height of plot text above bar plot (float)
         :param text_fontsize: fontsize of bar plot text (int/flaot)
-        :param savefigure: whether to save the figure as a pdf
+        :param savefigure: whether to save the figure as a pdf (bool)
         :param show_type: text to show above the bars, either 'percentage_predicted' or RMSE (string)
         :param color_scheme: color scheme for bars (string)
-        :param yticks_to_use: yticks for the barplots
+        :param yticks_to_use: yticks for the barplots (list)
         :return: None, plots are shown
         """
 
@@ -3006,9 +3037,15 @@ class eels_rf_setup():
         """
         Wrapper function which adds a specified number of mixture samples to our spectral dataset.
         :param len_mixtures: number of integer spectra to combine into mixture spectra. This parameter will random
-        sample the integer spectra 9 total times this number
+        sample the integer spectra 9 total times this number (int)
         :param len_combinations: for each combination of integer spectra, the number of different mixture spectra to
         generate (ie a mixture of Cu(0), Cu2O and CuO will be mixed with different ratios 20 times if this value is 20)
+        (int)
+        :param include_mixtures_all: whether to include mixtures containing Cu(0), Cu(I), and Cu(II) (bool)
+        :param gen_type: how to select mixtures. Can either be uniform across Cu(0) to Cu(II) or random samples.
+        parameters are uniform or random (string)
+        :param sim_column: the column of the spectral df the simulated spectra are drawn from (string)
+        :param cumulative_column: the column of the spectral df the cumulative simulated spectra are drawn from (string)
         :return: Updates dataframe with mixtures
         """
         # 100 evenly spaced components from 0 to 1 which will be random sampled to build out the mixture spectra
@@ -3086,6 +3123,8 @@ class eels_rf_setup():
         :param cu_metal: values to random sample for Cu metal's mixture ratios (list/ndarray)
         :param cu_1: values to random sample for Cu metal's mixture ratios (list/ndarray)
         :param cu_2: values to random sample for Cu metal's mixture ratios (list/ndarray)
+        :param gen_type: how to select mixtures. Can either be uniform across Cu(0) to Cu(II) or random samples.
+        parameters are uniform or random (string)
         :return:
         """
 
@@ -3213,10 +3252,12 @@ class eels_rf_setup():
         return mixture_df
 
 
-    def predict_set_of_spectra(self, df_slice, cumulative_column, sim_column, using_error_df = False, ):
+    def predict_set_of_spectra(self, df_slice, cumulative_column, sim_column, using_error_df = False):
         """
         Runs predictions on a subset of a pandas dataframe containing spectra and oxidation state labels
         :param df_slice: dataset to predict (pandas dataframe)
+        :param sim_column: the column of the spectral df the simulated spectra are drawn from (string)
+        :param cumulative_column: the column of the spectral df the cumulative simulated spectra are drawn from (string)
         :param using_error_df: whether the inputted dataframe is an error dataframe (bool)
         :return: dataframe containing predictions, spectra and other labels/prediction statistics
         """
@@ -3293,24 +3334,29 @@ class eels_rf_setup():
 
     def random_forest_train_bond_valance(self, kind='regression', bv_column='BV Used For Alignment',
                                              spectra_to_predict='925-970 Onset Energy Removed Broadened 0.3 eV',
-                                             test_fraction=0.25,  show_uncertianty=True,num_trees=500,
+                                             test_fraction=0.25,  show_uncertainty=True,num_trees=500,
                                              energy_col='new Scaled Energies use', max_features='auto',
                                          split_by_id_mixed_valent = True, use_full_training_data = False):
         """
         This function trains the random forest model based on the pandas dataframe provided when the object was
         initialized. It then generates attributes corresponding to the model itself, a dataframe describing the
         predictions, the training set and the test set.
-
+        :param kind: the type of prediction model to train. Options are regression and categorical (string)
         :param bv_column: the column in the dataframe containing the oxidation state labels (string)
         :param spectra_to_predict: the column in the dataframe containing the spectra (string)
         :param test_fraction: fraction of the dataset used for testing (float between 0 and 1)
-        :param show_uncertianty: whether to include detailed statistical metrics about each prediction in the final
+        :param show_uncertainty: whether to include detailed statistical metrics about each prediction in the final
         output (bool)
         :param num_trees: number of trees in the random forest (int)
         :param energy_col: the column in the dataframe containing the energy values corresponding to the spectrum
         (string)
         :param max_features: the maximum features each decision tree in the random forest has access to (string or int,
         if string one of 'auto' or 'sqrt')
+        :param split_by_id_mixed_valent: whether to split the train/test sets along mixture composition or whether to do
+        a truly random split. The latter is not recommended due to the similarity in mixture samples with very similar
+        proportions (bool)
+        :param use_full_training_data: whether to generate a model trained on the full dataset or reserve a fraction for
+        testing (bool)
         :return: None, output saved as attributes
         """
         # label spectra and energy value
@@ -3465,7 +3511,7 @@ class eels_rf_setup():
             # predict test set
             predictions = rf_model.predict(updated_spectra_test)
 
-            if show_uncertianty:
+            if show_uncertainty:
                 # build prediction standard deviation by storing the predictions of each decision tree
                 predictions_full = []
                 trees = rf_model.estimators_
@@ -3606,6 +3652,7 @@ def scale_spectra_flex(df_w_spectra, zero_energy='default', energy_col='Energies
     :param output_col_energy: the name to give the scaled energy column created by this function (string)
     :param output_col_intensity: the name to give the scaled intensity column created by this function (string)
     :param show_plot: whether to show plots illustrating the scaling process (bool)
+    :param savefigure: whether to save the generated plots (bool)
     :return: dataframe updated with scaled spectra columns
     """
     # define accumulators to hold new spectra/energies
@@ -3751,7 +3798,7 @@ def build_L2_3(l3, l2, show_plot=True, savefigure = False):
     :param l3: L3 spectrum (ndarray)
     :param l2: L2 spectrum (ndarray)
     :param show_plot: whether to show the generated L2,3 spectrum and component spectra
-    :return: The L2,3 spectrum, list of ndarray first entery energies, second spectrum
+    :return: The L2,3 spectrum, list of ndarray first entry energies, second spectrum
     """
     # interpolate L2 and L3 spectra so they start at the same point and are on a common energy axis
     interp_min_L3 = round(min(l3.T[0]) + 0.15, 1)
