@@ -9,7 +9,7 @@ The "Paper_Figures.ipynb" notebook reproduces all the plots that comprise the 6 
 
 "Analysis_objects_and_functions.py" contains an object, called eels_rf_setup, which runs most of the code discussed in this work. A few additional visualization functions are included at the end.
 
-Of the six directories, three contain spectra analyzed by this work (Cu_deconvolved_spectra, Additional_Literature_Spectra and xas paper). The fourth, Figures, contains the saved plots from "Paper_Figures.ipynb" and the final figure files. The fifth, Dataset_generation, contains the scripts used to generate the data used by this work. The sixth, vizualization files, contains a few small files used in "Paper_Figures.ipynb". The project data files can be found at https://drive.google.com/drive/folders/1hsffSo7_6LB5TfsfH9-85lvbodeZTDUC?usp=sharing
+Of the six directories, three contain spectra analyzed by this work (Cu_deconvolved_spectra, Additional_Literature_Spectra and xas paper). The fourth, Figures, contains the saved plots from "Paper_Figures.ipynb" and the final figure files. The fifth, Dataset_generation, contains the scripts used to generate the data used by this work. The sixth, vizualization files, contains a few small files used in "Paper_Figures.ipynb". The project data files can be found at https://zenodo.org/records/18142209
 
 In particular, "Cu_reproducable_alignment_df_extracted_110222.joblib" is a dataframe containing the simulated XAS spectra and is needed to run "Paper_Figures.ipynb" 
 
